@@ -16,13 +16,13 @@ import feedparser
 import requests
 from urllib.parse import urljoin, urlparse
 import json
+import whisper
 
 
 class PodcastProcessor:
     def __init__(self, output_dir: str = "./output"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
-        self.ollama_base_url = "http://localhost:11434"
     
     def parse_rss_feed(self, rss_url: str) -> Dict:
         """Parse RSS feed and extract latest episode data."""
@@ -139,62 +139,68 @@ class PodcastProcessor:
         except Exception as e:
             raise RuntimeError(f"Failed to download media file: {e}")
     
-    def transcribe_with_ollama(self, media_file_path: str) -> str:
-        """Transcribe media file using Ollama API."""
+    def transcribe_with_whisper(self, media_file_path: str) -> str:
+        """Transcribe media file using OpenAI Whisper."""
         print(f"Transcribing media file: {media_file_path}")
+        print("Loading Whisper model (this may take a moment on first run)...")
         
         try:
-            # First, try to use a local whisper installation or similar
-            # Note: This assumes you have a transcription model available through Ollama
-            # or a compatible API endpoint
+            # Load the Whisper model
+            # Using 'base' model as a good balance between speed and accuracy
+            # Other options: tiny, small, medium, large
+            model = whisper.load_model("base")
             
-            # Check if Ollama is running
-            try:
-                response = requests.get(f"{self.ollama_base_url}/api/tags", timeout=5)
-                if response.status_code != 200:
-                    return "Error: Ollama API is not accessible. Please ensure Ollama is running."
-            except requests.exceptions.RequestException:
-                return "Error: Cannot connect to Ollama API. Please ensure Ollama is running on localhost:11434."
+            print("Model loaded. Starting transcription...")
             
-            # For now, we'll provide instructions and a fallback
-            # In a real implementation, you would either:
-            # 1. Use a Whisper model through Ollama (if available)
-            # 2. Use OpenAI Whisper directly
-            # 3. Use another speech-to-text service
+            # Transcribe the audio file
+            result = model.transcribe(media_file_path)
             
-            fallback_transcription = f"""
-# Manual Transcription Required
+            # Extract the transcription text
+            transcription = result["text"].strip()
+            
+            # Add some metadata about the transcription
+            detected_language = result.get("language", "unknown")
+            
+            formatted_transcription = f"""**Transcription Language:** {detected_language}
 
-This is a placeholder transcription. To implement audio transcription with Ollama:
+**Transcription:**
 
-## Option 1: Use Whisper directly
-Install and use OpenAI Whisper:
-```bash
-pip install openai-whisper
-whisper "{media_file_path}" --output_format txt
-```
+{transcription}
 
-## Option 2: Configure Ollama with a transcription model
-If you have a transcription model available through Ollama, modify this method
-to send the audio file to the appropriate endpoint.
+---
+*Transcribed using OpenAI Whisper (base model)*"""
+            
+            print(f"Transcription completed! Language detected: {detected_language}")
+            print(f"Transcription length: {len(transcription)} characters")
+            
+            return formatted_transcription
+            
+        except Exception as e:
+            error_msg = f"Whisper transcription failed: {e}"
+            print(error_msg)
+            
+            # Provide fallback information
+            fallback = f"""# Transcription Error
 
-## Option 3: Use external service
-Integrate with services like:
-- OpenAI Whisper API
-- Google Speech-to-Text
-- Azure Speech Services
+{error_msg}
 
 ## Media File Information
 - File: {media_file_path}
 - Size: {os.path.getsize(media_file_path) if os.path.exists(media_file_path) else 'Unknown'} bytes
 
-Please transcribe this file manually or implement one of the above solutions.
+## Troubleshooting
+1. Ensure the media file is a valid audio/video format
+2. Check that you have enough disk space and memory
+3. Try with a smaller audio file first
+4. Consider using a smaller Whisper model (tiny/small) if you have limited resources
+
+## Manual Transcription
+You can also transcribe manually using:
+```bash
+whisper "{media_file_path}" --output_format txt
+```
 """
-            
-            return fallback_transcription.strip()
-            
-        except Exception as e:
-            return f"Transcription failed: {e}"
+            return fallback
     
     def create_markdown_file(self, episode_data: Dict, transcription: str) -> str:
         """Create markdown file with episode metadata and transcription."""
@@ -279,7 +285,7 @@ Please transcribe this file manually or implement one of the above solutions.
             
             try:
                 # Transcribe media file
-                transcription = self.transcribe_with_ollama(media_file)
+                transcription = self.transcribe_with_whisper(media_file)
                 
                 # Create markdown file
                 markdown_file = self.create_markdown_file(episode_data, transcription)

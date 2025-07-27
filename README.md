@@ -19,7 +19,7 @@ pip install -r requirements.txt
 python podknow.py <rss_feed_url> [-o output_directory]
 
 # Example
-python podknow.py "https://example.com/podcast/rss" -o ./my_podcasts
+python podknow.py "https://rss.art19.com/tim-ferriss-show" -o ./output
 ```
 
 https://rss.art19.com/tim-ferriss-show
