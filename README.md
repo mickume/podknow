@@ -16,10 +16,22 @@ Create a python 3.12 command line utility that does the following:
 pip install -r requirements.txt
 
 # Run the utility
-python podknow.py <rss_feed_url> [-o output_directory]
+python podknow.py <rss_feed_url> [-o output_directory] [-e episode_number]
 
-# Example
+# Examples
+# Process latest episode
 python podknow.py "https://rss.art19.com/tim-ferriss-show" -o ./output
+
+# Process specific episode by iTunes episode number
+python podknow.py "https://rss.art19.com/tim-ferriss-show" -o ./output -e 819
 ```
 
 https://rss.art19.com/tim-ferriss-show
+
+https://github.com/openai/whisper
+https://github.com/ggml-org/whisper.cpp
+
+
+/Users/mkuehl/Library/Mobile\ Documents/iCloud\~md\~obsidian/Documents/exobrain/2_resources/podcasts
+
+<itunes:episode>819</itunes:episode>

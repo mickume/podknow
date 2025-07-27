@@ -24,8 +24,8 @@ class PodcastProcessor:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
     
-    def parse_rss_feed(self, rss_url: str) -> Dict:
-        """Parse RSS feed and extract latest episode data."""
+    def parse_rss_feed(self, rss_url: str, episode_number: Optional[str] = None) -> Dict:
+        """Parse RSS feed and extract episode data (latest or specific episode)."""
         print(f"Fetching RSS feed from: {rss_url}")
         
         try:
@@ -36,8 +36,51 @@ class PodcastProcessor:
             if not feed.entries:
                 raise ValueError("No episodes found in RSS feed")
             
-            # Get the latest episode (first entry)
-            latest_episode = feed.entries[0]
+            # Find the target episode
+            target_episode = None
+            
+            if episode_number:
+                print(f"Looking for episode number: {episode_number}")
+                # Search for specific episode by iTunes episode number
+                for entry in feed.entries:
+                    # Check for iTunes episode number
+                    itunes_episode = None
+                    if hasattr(entry, 'itunes_episode'):
+                        itunes_episode = entry.itunes_episode
+                    elif hasattr(entry, 'tags'):
+                        # Look through tags for itunes:episode
+                        for tag in entry.tags:
+                            if tag.term.lower() in ['itunes:episode', 'episode']:
+                                itunes_episode = tag.label or getattr(tag, 'value', None)
+                                break
+                    
+                    # Also check in the raw entry data
+                    if not itunes_episode and hasattr(entry, 'itunes_episode'):
+                        itunes_episode = str(entry.itunes_episode)
+                    
+                    # Convert to string for comparison
+                    if itunes_episode and str(itunes_episode).strip() == str(episode_number).strip():
+                        target_episode = entry
+                        print(f"Found episode {episode_number}: {entry.title}")
+                        break
+                
+                if not target_episode:
+                    # If not found by iTunes episode, try searching by title/description
+                    print(f"Episode {episode_number} not found by iTunes episode number. Checking titles...")
+                    for entry in feed.entries:
+                        if str(episode_number) in entry.title:
+                            target_episode = entry
+                            print(f"Found episode by title match: {entry.title}")
+                            break
+                    
+                    if not target_episode:
+                        raise ValueError(f"Episode {episode_number} not found in RSS feed")
+            else:
+                # Get the latest episode (first entry)
+                target_episode = feed.entries[0]
+                print(f"Using latest episode: {target_episode.title}")
+            
+            latest_episode = target_episode
             
             # Extract episode metadata
             episode_data = {
@@ -269,11 +312,11 @@ whisper "{media_file_path}" --output_format txt
         
         return str(filepath)
     
-    def process_podcast(self, rss_url: str) -> str:
+    def process_podcast(self, rss_url: str, episode_number: Optional[str] = None) -> str:
         """Main processing function."""
         try:
             # Parse RSS feed
-            episode_data = self.parse_rss_feed(rss_url)
+            episode_data = self.parse_rss_feed(rss_url, episode_number)
             
             # Find media URL
             media_url = self.find_media_url(episode_data)
@@ -316,11 +359,15 @@ def main():
         default="./output",
         help="Output directory for markdown files (default: ./output)"
     )
+    parser.add_argument(
+        "-e", "--episode",
+        help="Specific episode number to process (by iTunes episode number). If not provided, uses latest episode."
+    )
     
     args = parser.parse_args()
     
     processor = PodcastProcessor(args.output)
-    result = processor.process_podcast(args.rss_url)
+    result = processor.process_podcast(args.rss_url, args.episode)
     
     if result:
         print(f"\nSuccess! Markdown file created: {result}")
