@@ -250,6 +250,19 @@ whisper "{media_file_path}" --output_format txt
         # Create safe filename from episode title
         safe_title = re.sub(r'[^\w\s-]', '', episode_data['title'])
         safe_title = re.sub(r'[-\s]+', '-', safe_title)
+        
+        # Truncate filename if too long (max 100 chars for the title part)
+        max_title_length = 100
+        if len(safe_title) > max_title_length:
+            # Try to truncate at word boundary
+            truncated = safe_title[:max_title_length]
+            last_dash = truncated.rfind('-')
+            if last_dash > max_title_length * 0.7:  # If we can find a dash in the last 30%
+                safe_title = truncated[:last_dash]
+            else:
+                safe_title = truncated
+            print(f"Filename truncated due to length: {safe_title}...")
+        
         filename = f"{safe_title}.md"
         filepath = self.output_dir / filename
         
