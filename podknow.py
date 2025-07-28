@@ -245,7 +245,7 @@ whisper "{media_file_path}" --output_format txt
 """
             return fallback
     
-    def create_markdown_file(self, episode_data: Dict, transcription: str) -> str:
+    def create_markdown_file(self, episode_data: Dict, transcription: str, media_url: str) -> str:
         """Create markdown file with episode metadata and transcription."""
         # Create safe filename from episode title
         safe_title = re.sub(r'[^\w\s-]', '', episode_data['title'])
@@ -269,20 +269,23 @@ whisper "{media_file_path}" --output_format txt
         print(f"Creating markdown file: {filepath}")
         
         content = []
-        content.append(f"# {episode_data['title']}")
+        
+        # Add YAML front matter
+        content.append("---")
+        content.append(f"title: \"{episode_data['title']}\"")
+        if episode_data['duration']:
+            content.append(f"duration: \"{episode_data['duration']}\"")
+        if episode_data['link']:
+            content.append(f"episode_link: \"{episode_data['link']}\"")
+        if media_url:
+            content.append(f"media_url: \"{media_url}\"")
+        if episode_data['published']:
+            content.append(f"published: \"{episode_data['published']}\"")
+        content.append("---")
         content.append("")
         
-        if episode_data['published']:
-            content.append(f"**Published:** {episode_data['published']}")
-            content.append("")
-        
-        if episode_data['duration']:
-            content.append(f"**Duration:** {episode_data['duration']}")
-            content.append("")
-        
-        if episode_data['link']:
-            content.append(f"**Episode Link:** {episode_data['link']}")
-            content.append("")
+        content.append(f"# {episode_data['title']}")
+        content.append("")
         
         # Description
         if episode_data['description']:
@@ -344,7 +347,7 @@ whisper "{media_file_path}" --output_format txt
                 transcription = self.transcribe_with_whisper(media_file)
                 
                 # Create markdown file
-                markdown_file = self.create_markdown_file(episode_data, transcription)
+                markdown_file = self.create_markdown_file(episode_data, transcription, media_url)
                 
                 return markdown_file
                 
