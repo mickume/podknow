@@ -191,7 +191,7 @@ class PodcastProcessor:
             # Load the Whisper model
             # Using 'base' model as a good balance between speed and accuracy
             # Other options: tiny, small, medium, large
-            model = whisper.load_model("base")
+            model = whisper.load_model("small")
             
             print("Model loaded. Starting transcription...")
             
