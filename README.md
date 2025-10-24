@@ -1,37 +1,79 @@
-README
+# PodKnow
 
-Create a python 3.12 command line utility that does the following:
-- it receives an URL to a podcast RSS feed as input
-- retrieve the podcast RSS feed and extract the data for the latest, newest podcast episode
-- create a markdown file in a predefined location with the podcast episode meta data as content, especially: the title, any description, chapter marks
-- if there are links mentioned in the metadata, create a list of these links
-- next, find the url to the podcast media file, either in mp3 or mp4 format.
-- download the podcat media file to a temporary location
-- feed the podcast media file to a LLM for transcription. Assume that there is a local Ollama API available.
-- append the podcast transcription to the markdown file
+A command-line tool that downloads podcast episodes from RSS feeds and transcribes them using OpenAI Whisper.
 
----
-```shell
+## What It Does
+
+PodKnow takes a podcast RSS feed URL and:
+1. Downloads the audio/video file for an episode
+2. Transcribes it using OpenAI Whisper
+3. Creates a markdown file with episode metadata and full transcription
+
+Perfect for creating searchable, text-based archives of your favorite podcasts.
+
+## Installation
+
+**Requirements:** Python 3.13 or 3.12 (Python 3.14+ not supported due to dependency limitations)
+
+```bash
+# Create virtual environment with Python 3.13
+python3.13 -m venv venv
+
+# Activate virtual environment
+source venv/bin/activate
+
 # Install dependencies
 pip install -r requirements.txt
-
-# Run the utility
-python podknow.py <rss_feed_url> [-o output_directory] [-e episode_number]
-
-# Examples
-# Process latest episode
-python podknow.py "https://rss.art19.com/tim-ferriss-show" -o ./output
-
-# Process specific episode by iTunes episode number
-python podknow.py "https://rss.art19.com/tim-ferriss-show" -o ./output -e 819
 ```
 
-https://rss.art19.com/tim-ferriss-show
+## Usage
 
-https://github.com/openai/whisper
-https://github.com/ggml-org/whisper.cpp
+### List Available Episodes
 
+```bash
+python podknow.py <rss_feed_url> --list
+```
 
-/Users/mkuehl/Library/Mobile\ Documents/iCloud\~md\~obsidian/Documents/exobrain/2_resources/podcasts
+Example:
+```bash
+python podknow.py https://feeds.megaphone.fm/vergecast --list --limit 5
+```
 
-<itunes:episode>819</itunes:episode>
+This shows the most recent episodes with their position numbers.
+
+### Download and Transcribe an Episode
+
+```bash
+python podknow.py <rss_feed_url> -e <episode_number>
+```
+
+Examples:
+```bash
+# Process the latest episode
+python podknow.py https://feeds.megaphone.fm/vergecast
+
+# Process a specific episode by position (from --list output)
+python podknow.py https://feeds.megaphone.fm/vergecast -e 2
+
+# Specify output directory
+python podknow.py https://feeds.megaphone.fm/vergecast -e 2 -o ./my-transcripts
+```
+
+## Command-Line Options
+
+- `rss_url` - Podcast RSS feed URL (required)
+- `-l, --list` - List recent episodes without processing
+- `-n, --limit` - Number of episodes to list (default: 10)
+- `-e, --episode` - Episode number/position to process
+- `-o, --output` - Output directory for markdown files (default: ./output)
+
+## Output
+
+Creates a markdown file containing:
+- Episode title and metadata
+- Publication date and duration
+- Episode description
+- Links mentioned in the episode
+- Full transcription with detected language
+
+Files are saved to `./output/` by default.
