@@ -669,34 +669,34 @@ keyword1, keyword2, keyword3, ..."""
                 content.append("")
 
         # Description
-        if episode_data['description']:
-            content.append("## Description")
-            content.append("")
-            content.append(episode_data['description'])
-            content.append("")
+        #if episode_data['description']:
+        #    content.append("## Description")
+        #    content.append("")
+        #    content.append(episode_data['description'])
+        #    content.append("")
         
         # Episode Notes (from RSS) if different from description
-        if episode_data['summary'] and episode_data['summary'] != episode_data['description']:
-            content.append("## Episode Notes")
-            content.append("")
-            content.append(episode_data['summary'])
-            content.append("")
+        #if episode_data['summary'] and episode_data['summary'] != episode_data['description']:
+        #    content.append("## Episode Notes")
+        #    content.append("")
+        #    content.append(episode_data['summary'])
+        #    content.append("")
         
         # Chapter marks
-        if episode_data['chapters']:
-            content.append("## Chapters")
-            content.append("")
-            for chapter in episode_data['chapters']:
-                content.append(f"- {chapter}")
-            content.append("")
+        #if episode_data['chapters']:
+        #    content.append("## Chapters")
+        #    content.append("")
+        #    for chapter in episode_data['chapters']:
+        #        content.append(f"- {chapter}")
+        #    content.append("")
         
         # Links
-        if episode_data['links']:
-            content.append("## Links")
-            content.append("")
-            for link in episode_data['links']:
-                content.append(f"- {link}")
-            content.append("")
+        #if episode_data['links']:
+        #    content.append("## Links")
+        #    content.append("")
+        #    for link in episode_data['links']:
+        #        content.append(f"- {link}")
+        #    content.append("")
         
         # Transcription
         content.append("## Transcription")
