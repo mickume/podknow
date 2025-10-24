@@ -22,9 +22,10 @@ import whisper
 
 
 class PodcastProcessor:
-    def __init__(self, output_dir: str = "./output"):
+    def __init__(self, output_dir: str = "./output", paragraph_threshold: float = 2.0):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
+        self.paragraph_threshold = paragraph_threshold
     
     def parse_rss_feed(self, rss_url: str, episode_number: Optional[str] = None) -> Dict:
         """Parse RSS feed and extract episode data (latest or specific episode)."""
@@ -253,6 +254,69 @@ class PodcastProcessor:
         except Exception as e:
             raise RuntimeError(f"Failed to download media file: {e}")
     
+    def format_segments_to_paragraphs(self, segments: List[Dict], pause_threshold: float = 2.0,
+                                      include_timestamps: bool = True) -> str:
+        """
+        Format Whisper segments into readable paragraphs based on pause duration.
+
+        Args:
+            segments: List of segment dictionaries from Whisper
+            pause_threshold: Minimum pause in seconds to start a new paragraph (default: 2.0)
+            include_timestamps: Whether to include timestamps before each paragraph
+
+        Returns:
+            Formatted text with paragraph breaks
+        """
+        if not segments:
+            return ""
+
+        paragraphs = []
+        current_paragraph = []
+        last_end_time = 0
+
+        for segment in segments:
+            start_time = segment.get('start', 0)
+            end_time = segment.get('end', 0)
+            text = segment.get('text', '').strip()
+
+            if not text:
+                continue
+
+            # Check if there's a significant pause since the last segment
+            pause_duration = start_time - last_end_time
+
+            if pause_duration >= pause_threshold and current_paragraph:
+                # Finish current paragraph and start a new one
+                paragraph_text = ' '.join(current_paragraph)
+
+                if include_timestamps:
+                    # Format timestamp as [MM:SS]
+                    minutes = int(last_end_time // 60)
+                    seconds = int(last_end_time % 60)
+                    timestamp = f"[{minutes:02d}:{seconds:02d}]"
+                    paragraphs.append(f"{timestamp} {paragraph_text}")
+                else:
+                    paragraphs.append(paragraph_text)
+
+                current_paragraph = []
+
+            current_paragraph.append(text)
+            last_end_time = end_time
+
+        # Add the final paragraph
+        if current_paragraph:
+            paragraph_text = ' '.join(current_paragraph)
+
+            if include_timestamps:
+                minutes = int(last_end_time // 60)
+                seconds = int(last_end_time % 60)
+                timestamp = f"[{minutes:02d}:{seconds:02d}]"
+                paragraphs.append(f"{timestamp} {paragraph_text}")
+            else:
+                paragraphs.append(paragraph_text)
+
+        return '\n\n'.join(paragraphs)
+
     def transcribe_with_whisper(self, media_file_path: str) -> str:
         """Transcribe media file using OpenAI Whisper."""
         print(f"Transcribing media file: {media_file_path}")
@@ -276,13 +340,25 @@ class PodcastProcessor:
 
             # Transcribe the audio file
             result = model.transcribe(media_file_path, verbose=False)
-            
-            # Extract the transcription text
-            transcription = result["text"].strip()
-            
-            # Add some metadata about the transcription
+
+            # Extract segments and format into paragraphs
+            segments = result.get("segments", [])
             detected_language = result.get("language", "unknown")
-            
+
+            if segments:
+                # Format segments into readable paragraphs with timestamps
+                transcription = self.format_segments_to_paragraphs(
+                    segments,
+                    pause_threshold=self.paragraph_threshold,
+                    include_timestamps=True
+                )
+                print(f"Transcription completed! Created {len(transcription.split(chr(10) + chr(10)))} paragraphs.")
+            else:
+                # Fallback to raw text if no segments available
+                transcription = result["text"].strip()
+                print("Transcription completed! (No segments available, using raw text)")
+
+            # Add some metadata about the transcription
             formatted_transcription = f"""**Transcription Language:** {detected_language}
 
 **Transcription:**
@@ -290,11 +366,11 @@ class PodcastProcessor:
 {transcription}
 
 ---
-*Transcribed using OpenAI Whisper (base model)*"""
-            
-            print(f"Transcription completed! Language detected: {detected_language}")
-            print(f"Transcription length: {len(transcription)} characters")
-            
+*Transcribed using OpenAI Whisper (small model) with paragraph segmentation based on speech pauses*"""
+
+            print(f"Language detected: {detected_language}")
+            print(f"Total characters: {len(transcription)}")
+
             return formatted_transcription
             
         except Exception as e:
@@ -469,10 +545,16 @@ def main():
         default=10,
         help="Number of episodes to list when using --list (default: 10)"
     )
+    parser.add_argument(
+        "-p", "--paragraph-threshold",
+        type=float,
+        default=2.0,
+        help="Minimum pause in seconds to create a new paragraph in transcription (default: 2.0)"
+    )
 
     args = parser.parse_args()
 
-    processor = PodcastProcessor(args.output)
+    processor = PodcastProcessor(args.output, args.paragraph_threshold)
 
     # If list mode is enabled, just list episodes and exit
     if args.list:

@@ -66,6 +66,7 @@ python podknow.py https://feeds.megaphone.fm/vergecast -e 2 -o ./my-transcripts
 - `-n, --limit` - Number of episodes to list (default: 10)
 - `-e, --episode` - Episode number/position to process
 - `-o, --output` - Output directory for markdown files (default: ./output)
+- `-p, --paragraph-threshold` - Minimum pause in seconds to create paragraph breaks (default: 2.0)
 
 ## Output
 
@@ -75,5 +76,19 @@ Creates a markdown file containing:
 - Episode description
 - Links mentioned in the episode
 - Full transcription with detected language
+- **Readable paragraph breaks** - Automatically segments text based on speech pauses
+- **Timestamps** - Each paragraph includes a timestamp for easy navigation
 
 Files are saved to `./output/` by default.
+
+## Customizing Paragraph Breaks
+
+By default, pauses of 2 seconds or longer create new paragraphs. You can adjust this:
+
+```bash
+# More paragraphs (break on shorter pauses)
+python podknow.py <url> -e 1 --paragraph-threshold 1.0
+
+# Fewer paragraphs (only break on longer pauses)
+python podknow.py <url> -e 1 --paragraph-threshold 3.0
+```
