@@ -18,7 +18,15 @@ import feedparser
 import requests
 from urllib.parse import urljoin, urlparse
 import json
-import whisper
+
+try:
+    import mlx_whisper
+    WHISPER_BACKEND = "mlx"
+    print("Using MLX-Whisper (optimized for Apple Silicon)")
+except ImportError:
+    import whisper
+    WHISPER_BACKEND = "openai"
+    print("Warning: MLX-Whisper not found. Using standard OpenAI Whisper (slower on Apple Silicon)")
 
 
 class PodcastProcessor:
@@ -318,9 +326,9 @@ class PodcastProcessor:
         return '\n\n'.join(paragraphs)
 
     def transcribe_with_whisper(self, media_file_path: str) -> str:
-        """Transcribe media file using OpenAI Whisper."""
+        """Transcribe media file using Whisper (MLX or OpenAI backend)."""
         print(f"Transcribing media file: {media_file_path}")
-        print("Loading Whisper model (this may take a moment on first run)...")
+        print(f"Loading Whisper model (backend: {WHISPER_BACKEND})...")
 
         try:
             # Suppress warnings and info messages from Whisper, PyTorch, and other libraries
@@ -331,15 +339,21 @@ class PodcastProcessor:
             logging.getLogger("torch").setLevel(logging.ERROR)
             logging.getLogger("numba").setLevel(logging.ERROR)
 
-            # Load the Whisper model
-            # Using 'small' model as a good balance between speed and accuracy
-            # Other options: tiny, small, base, medium, large
-            model = whisper.load_model("small")
+            if WHISPER_BACKEND == "mlx":
+                # MLX-Whisper: Optimized for Apple Silicon (Metal + Neural Engine)
+                print("Using Apple Silicon acceleration (Metal + Neural Engine)...")
+                result = mlx_whisper.transcribe(
+                    media_file_path,
+                    path_or_hf_repo="mlx-community/whisper-small-mlx",
+                    verbose=False
+                )
+            else:
+                # OpenAI Whisper: Standard PyTorch backend
+                print("Using standard PyTorch backend...")
+                model = whisper.load_model("small")
+                result = model.transcribe(media_file_path, verbose=False)
 
-            print("Model loaded. Starting transcription...")
-
-            # Transcribe the audio file
-            result = model.transcribe(media_file_path, verbose=False)
+            print("Transcription completed!")
 
             # Extract segments and format into paragraphs
             segments = result.get("segments", [])
@@ -359,6 +373,7 @@ class PodcastProcessor:
                 print("Transcription completed! (No segments available, using raw text)")
 
             # Add some metadata about the transcription
+            backend_info = "MLX-Whisper (Apple Silicon optimized)" if WHISPER_BACKEND == "mlx" else "OpenAI Whisper"
             formatted_transcription = f"""**Transcription Language:** {detected_language}
 
 **Transcription:**
@@ -366,7 +381,7 @@ class PodcastProcessor:
 {transcription}
 
 ---
-*Transcribed using OpenAI Whisper (small model) with paragraph segmentation based on speech pauses*"""
+*Transcribed using {backend_info} (small model) with paragraph segmentation based on speech pauses*"""
 
             print(f"Language detected: {detected_language}")
             print(f"Total characters: {len(transcription)}")
