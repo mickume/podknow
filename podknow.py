@@ -10,6 +10,8 @@ import sys
 import os
 import tempfile
 import re
+import warnings
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional
 import feedparser
@@ -65,16 +67,28 @@ class PodcastProcessor:
                         break
                 
                 if not target_episode:
-                    # If not found by iTunes episode, try searching by title/description
-                    print(f"Episode {episode_number} not found by iTunes episode number. Checking titles...")
-                    for entry in feed.entries:
-                        if str(episode_number) in entry.title:
-                            target_episode = entry
-                            print(f"Found episode by title match: {entry.title}")
-                            break
-                    
-                    if not target_episode:
-                        raise ValueError(f"Episode {episode_number} not found in RSS feed")
+                    # If not found by iTunes episode, try treating as position (1-based index) first
+                    print(f"Episode {episode_number} not found by iTunes episode number.")
+                    try:
+                        position = int(episode_number)
+                        if 1 <= position <= len(feed.entries):
+                            target_episode = feed.entries[position - 1]
+                            print(f"Using feed position {position}: {target_episode.title}")
+                        else:
+                            raise ValueError(f"Position {position} out of range (feed has {len(feed.entries)} episodes)")
+                    except ValueError as ve:
+                        if "out of range" in str(ve):
+                            raise ve
+                        # Not a valid integer, try searching by title as last resort
+                        print(f"Not a valid position number. Checking titles...")
+                        for entry in feed.entries:
+                            if str(episode_number) in entry.title:
+                                target_episode = entry
+                                print(f"Found episode by title match: {entry.title}")
+                                break
+
+                        if not target_episode:
+                            raise ValueError(f"Episode '{episode_number}' not found in RSS feed (tried episode number, position, and title search)")
             else:
                 # Get the latest episode (first entry)
                 target_episode = feed.entries[0]
@@ -120,7 +134,64 @@ class PodcastProcessor:
             
         except Exception as e:
             raise RuntimeError(f"Failed to parse RSS feed: {e}")
-    
+
+    def list_episodes(self, rss_url: str, limit: int = 10) -> None:
+        """List recent episodes from the RSS feed."""
+        print(f"Fetching episodes from: {rss_url}\n")
+
+        try:
+            feed = feedparser.parse(rss_url)
+            if feed.bozo:
+                print(f"Warning: RSS feed parsing had issues: {feed.bozo_exception}\n")
+
+            if not feed.entries:
+                print("No episodes found in RSS feed.")
+                return
+
+            total_episodes = len(feed.entries)
+            episodes_to_show = min(limit, total_episodes)
+
+            print(f"Found {total_episodes} episode(s) in feed. Showing last {episodes_to_show}:\n")
+
+            # Display episodes
+            for idx, entry in enumerate(feed.entries[:episodes_to_show], 1):
+                title = getattr(entry, 'title', 'Unknown Title')
+                published = getattr(entry, 'published', 'Unknown date')
+
+                # Try to extract iTunes episode number
+                itunes_episode = None
+                if hasattr(entry, 'itunes_episode'):
+                    itunes_episode = entry.itunes_episode
+                elif hasattr(entry, 'tags'):
+                    for tag in entry.tags:
+                        if tag.term.lower() in ['itunes:episode', 'episode']:
+                            itunes_episode = tag.label or getattr(tag, 'value', None)
+                            break
+
+                # Format episode identifier and usage instruction
+                if itunes_episode:
+                    episode_id = f"Episode #{itunes_episode} (use: -e {itunes_episode})"
+                else:
+                    episode_id = f"Use: -e {idx}"
+
+                # Extract duration if available
+                duration = ""
+                if hasattr(entry, 'itunes_duration'):
+                    duration = f" - Duration: {entry.itunes_duration}"
+
+                print(f"  {idx:2d}. [{episode_id}]")
+                print(f"      \"{title}\"")
+                print(f"      Published: {published}{duration}")
+                print()
+
+            if total_episodes > episodes_to_show:
+                print(f"... and {total_episodes - episodes_to_show} more episode(s).")
+                print(f"Use --limit to show more episodes.\n")
+
+        except Exception as e:
+            print(f"Error fetching episodes: {e}")
+            sys.exit(1)
+
     def extract_links_from_text(self, text: str) -> List[str]:
         """Extract URLs from text content."""
         url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
@@ -186,17 +257,25 @@ class PodcastProcessor:
         """Transcribe media file using OpenAI Whisper."""
         print(f"Transcribing media file: {media_file_path}")
         print("Loading Whisper model (this may take a moment on first run)...")
-        
+
         try:
+            # Suppress warnings and info messages from Whisper, PyTorch, and other libraries
+            warnings.filterwarnings("ignore")
+
+            # Suppress logging output from various libraries
+            logging.getLogger("whisper").setLevel(logging.ERROR)
+            logging.getLogger("torch").setLevel(logging.ERROR)
+            logging.getLogger("numba").setLevel(logging.ERROR)
+
             # Load the Whisper model
-            # Using 'base' model as a good balance between speed and accuracy
-            # Other options: tiny, small, medium, large
+            # Using 'small' model as a good balance between speed and accuracy
+            # Other options: tiny, small, base, medium, large
             model = whisper.load_model("small")
-            
+
             print("Model loaded. Starting transcription...")
-            
+
             # Transcribe the audio file
-            result = model.transcribe(media_file_path)
+            result = model.transcribe(media_file_path, verbose=False)
             
             # Extract the transcription text
             transcription = result["text"].strip()
@@ -377,14 +456,32 @@ def main():
     )
     parser.add_argument(
         "-e", "--episode",
-        help="Specific episode number to process (by iTunes episode number). If not provided, uses latest episode."
+        help="Specific episode to process (iTunes episode number or feed position). Use --list to see available episodes and their identifiers."
     )
-    
+    parser.add_argument(
+        "-l", "--list",
+        action="store_true",
+        help="List recent episodes from the RSS feed without processing"
+    )
+    parser.add_argument(
+        "-n", "--limit",
+        type=int,
+        default=10,
+        help="Number of episodes to list when using --list (default: 10)"
+    )
+
     args = parser.parse_args()
-    
+
     processor = PodcastProcessor(args.output)
+
+    # If list mode is enabled, just list episodes and exit
+    if args.list:
+        processor.list_episodes(args.rss_url, args.limit)
+        sys.exit(0)
+
+    # Otherwise, proceed with normal processing
     result = processor.process_podcast(args.rss_url, args.episode)
-    
+
     if result:
         print(f"\nSuccess! Markdown file created: {result}")
     else:
