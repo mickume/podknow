@@ -77,12 +77,20 @@ python podknow.py https://feeds.megaphone.fm/vergecast -e 2 -o ./my-transcripts
 
 ## Command-Line Options
 
+### Basic Options
 - `rss_url` - Podcast RSS feed URL (required)
 - `-l, --list` - List recent episodes without processing
 - `-n, --limit` - Number of episodes to list (default: 10)
 - `-e, --episode` - Episode number/position to process
 - `-o, --output` - Output directory for markdown files (default: ./output)
+
+### Transcription Options
 - `-p, --paragraph-threshold` - Minimum pause in seconds to create paragraph breaks (default: 2.0)
+
+### LLM Options
+- `--llm-provider` - LLM provider: `ollama`, `claude`, or `none` (default: none)
+- `--llm-model` - Ollama model name (default: llama3.2:3b)
+- `--ollama-url` - Ollama API URL (default: http://localhost:11434)
 
 ## Output
 
@@ -109,10 +117,21 @@ python podknow.py <url> -e 1 --paragraph-threshold 1.0
 python podknow.py <url> -e 1 --paragraph-threshold 3.0
 ```
 
-## Optional: Ollama for LLM Processing
+## LLM Post-Processing (Optional)
 
-If you want to use local LLMs for post-processing (future feature), install Ollama:
+PodKnow can automatically generate episode summaries, extract key topics, and identify keywords using either **Ollama** (local, free) or **Claude** (API, paid).
 
+### What Gets Generated
+
+When enabled, PodKnow adds these sections to the markdown file BEFORE the transcript:
+
+1. **Summary** - 2-3 paragraph overview of the episode
+2. **Key Topics** - Up to 5 most important topics (one sentence each)
+3. **Keywords** - 10-15 relevant keywords for searchability
+
+### Option 1: Ollama (Recommended for M4)
+
+**Install Ollama:**
 ```bash
 # Install Ollama (native Apple Silicon version)
 brew install ollama
@@ -120,11 +139,65 @@ brew install ollama
 # Start Ollama service
 ollama serve
 
-# Pull a small, fast model
+# Pull recommended model (2GB download)
 ollama pull llama3.2:3b
 ```
 
+**Usage:**
+```bash
+# Use Ollama with default model (llama3.2:3b)
+python podknow.py <url> -e 1 --llm-provider ollama
+
+# Use different model
+python podknow.py <url> -e 1 --llm-provider ollama --llm-model gemma2:2b
+
+# Use high-quality model (slower)
+python podknow.py <url> -e 1 --llm-provider ollama --llm-model llama3.1:8b
+```
+
+**Recommended Models for M4:**
+- `llama3.2:3b` - Best balance (default)
+- `gemma2:2b` - Fastest, good quality
+- `llama3.1:8b` - Highest quality, slower
+
 **Note:** Ollama automatically uses Metal GPU acceleration on Apple Silicon - no configuration needed!
+
+### Option 2: Claude API
+
+**Setup:**
+```bash
+# Get API key from https://console.anthropic.com/
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# Or add to your shell profile
+echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc
+```
+
+**Usage:**
+```bash
+python podknow.py <url> -e 1 --llm-provider claude
+```
+
+**Cost:** Claude charges per token. A 1-hour podcast transcript typically costs $0.10-0.30 to analyze.
+
+### Comparison
+
+| Feature | Ollama | Claude |
+|---------|--------|--------|
+| Cost | Free | ~$0.10-0.30/episode |
+| Privacy | 100% local | Sends to API |
+| Speed on M4 | Very fast | Fast (network dependent) |
+| Quality | Excellent | Excellent |
+| Setup | Install + pull model | API key only |
+
+### Skip LLM Processing
+
+By default, LLM processing is disabled. To transcribe without analysis:
+
+```bash
+# Default behavior (no LLM)
+python podknow.py <url> -e 1
+```
 
 ## Performance Tips for Apple Silicon
 

@@ -30,10 +30,15 @@ except ImportError:
 
 
 class PodcastProcessor:
-    def __init__(self, output_dir: str = "./output", paragraph_threshold: float = 2.0):
+    def __init__(self, output_dir: str = "./output", paragraph_threshold: float = 2.0,
+                 llm_provider: str = "none", llm_model: str = "llama3.2:3b",
+                 ollama_url: str = "http://localhost:11434"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
         self.paragraph_threshold = paragraph_threshold
+        self.llm_provider = llm_provider
+        self.llm_model = llm_model
+        self.ollama_url = ollama_url
     
     def parse_rss_feed(self, rss_url: str, episode_number: Optional[str] = None) -> Dict:
         """Parse RSS feed and extract episode data (latest or specific episode)."""
@@ -414,8 +419,190 @@ whisper "{media_file_path}" --output_format txt
 ```
 """
             return fallback
-    
-    def create_markdown_file(self, episode_data: Dict, transcription: str, media_url: str) -> str:
+
+    def _call_ollama(self, transcript: str, model: str, url: str) -> Dict:
+        """Call Ollama API for transcript analysis."""
+        try:
+            import ollama
+
+            # Truncate if transcript too long (keep first 100K chars)
+            if len(transcript) > 100000:
+                print(f"Transcript is long ({len(transcript)} chars), truncating to 100K for analysis...")
+                transcript = transcript[:100000] + "\n\n[... transcript truncated ...]"
+
+            prompt = f"""Analyze this podcast transcript and provide:
+
+1. SUMMARY: Write a concise 2-3 paragraph summary of the episode
+2. TOP TOPICS: List the 5 most important topics discussed (one sentence each)
+3. KEYWORDS: List 10-15 relevant keywords
+
+Transcript:
+{transcript}
+
+Respond in this EXACT format:
+
+SUMMARY:
+[Your summary here]
+
+TOPICS:
+1. [First topic]
+2. [Second topic]
+3. [Third topic]
+4. [Fourth topic]
+5. [Fifth topic]
+
+KEYWORDS:
+keyword1, keyword2, keyword3, ..."""
+
+            client = ollama.Client(host=url)
+            response = client.chat(
+                model=model,
+                messages=[{
+                    'role': 'user',
+                    'content': prompt
+                }]
+            )
+
+            # Parse response
+            content = response['message']['content']
+            return self._parse_llm_response(content)
+
+        except Exception as e:
+            print(f"Ollama analysis failed: {e}")
+            print(f"  Make sure Ollama is running: ollama serve")
+            print(f"  And model is pulled: ollama pull {model}")
+            return None
+
+    def _call_claude(self, transcript: str) -> Dict:
+        """Call Claude API for transcript analysis."""
+        try:
+            import anthropic
+
+            # Truncate if transcript too long
+            if len(transcript) > 100000:
+                print(f"Transcript is long ({len(transcript)} chars), truncating to 100K for analysis...")
+                transcript = transcript[:100000] + "\n\n[... transcript truncated ...]"
+
+            prompt = f"""Analyze this podcast transcript and provide:
+
+1. SUMMARY: Write a concise 2-3 paragraph summary of the episode
+2. TOP TOPICS: List the 5 most important topics discussed (one sentence each)
+3. KEYWORDS: List 10-15 relevant keywords
+
+Transcript:
+{transcript}
+
+Respond in this EXACT format:
+
+SUMMARY:
+[Your summary here]
+
+TOPICS:
+1. [First topic]
+2. [Second topic]
+3. [Third topic]
+4. [Fourth topic]
+5. [Fifth topic]
+
+KEYWORDS:
+keyword1, keyword2, keyword3, ..."""
+
+            api_key = os.environ.get("ANTHROPIC_API_KEY")
+            if not api_key:
+                print("ERROR: ANTHROPIC_API_KEY environment variable not set")
+                print("  Set it with: export ANTHROPIC_API_KEY=sk-ant-...")
+                return None
+
+            client = anthropic.Anthropic(api_key=api_key)
+            response = client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=2000,
+                messages=[{
+                    "role": "user",
+                    "content": prompt
+                }]
+            )
+
+            # Parse response
+            content = response.content[0].text
+            return self._parse_llm_response(content)
+
+        except Exception as e:
+            print(f"Claude analysis failed: {e}")
+            return None
+
+    def _parse_llm_response(self, content: str) -> Dict:
+        """Parse structured LLM response into dictionary."""
+        try:
+            result = {
+                "summary": "",
+                "topics": [],
+                "keywords": []
+            }
+
+            # Split by sections
+            sections = content.split("\n\n")
+            current_section = None
+
+            for section in sections:
+                section = section.strip()
+
+                if section.startswith("SUMMARY:"):
+                    current_section = "summary"
+                    summary_text = section.replace("SUMMARY:", "").strip()
+                    if summary_text:
+                        result["summary"] = summary_text
+                elif section.startswith("TOPICS:"):
+                    current_section = "topics"
+                elif section.startswith("KEYWORDS:"):
+                    current_section = "keywords"
+                    keywords_text = section.replace("KEYWORDS:", "").strip()
+                    if keywords_text:
+                        result["keywords"] = [k.strip() for k in keywords_text.split(",")]
+                elif current_section == "summary" and section:
+                    result["summary"] += "\n\n" + section
+                elif current_section == "topics" and section:
+                    # Extract topic lines
+                    lines = section.split("\n")
+                    for line in lines:
+                        line = line.strip()
+                        if line and (line[0].isdigit() or line.startswith("-")):
+                            # Remove numbering
+                            topic = re.sub(r'^[\d\-\.\)]+\s*', '', line)
+                            if topic:
+                                result["topics"].append(topic)
+
+            # Limit topics to 5
+            result["topics"] = result["topics"][:5]
+
+            return result
+
+        except Exception as e:
+            print(f"Failed to parse LLM response: {e}")
+            return None
+
+    def analyze_transcript_with_llm(self, transcript: str) -> Optional[Dict]:
+        """
+        Analyze transcript using configured LLM provider.
+
+        Returns:
+            Dictionary with 'summary', 'topics', and 'keywords' keys, or None if analysis fails
+        """
+        if self.llm_provider == "none":
+            return None
+
+        print(f"\nAnalyzing transcript with {self.llm_provider}...")
+
+        if self.llm_provider == "ollama":
+            return self._call_ollama(transcript, self.llm_model, self.ollama_url)
+        elif self.llm_provider == "claude":
+            return self._call_claude(transcript)
+        else:
+            print(f"Unknown LLM provider: {self.llm_provider}")
+            return None
+
+    def create_markdown_file(self, episode_data: Dict, transcription: str, media_url: str,
+                            llm_analysis: Optional[Dict] = None) -> str:
         """Create markdown file with episode metadata and transcription."""
         # Create safe filename from episode title
         safe_title = re.sub(r'[^\w\s-]', '', episode_data['title'])
@@ -456,7 +643,31 @@ whisper "{media_file_path}" --output_format txt
         
         content.append(f"# {episode_data['title']}")
         content.append("")
-        
+
+        # LLM Analysis (if available)
+        if llm_analysis:
+            # Summary
+            if llm_analysis.get('summary'):
+                content.append("## Summary")
+                content.append("")
+                content.append(llm_analysis['summary'])
+                content.append("")
+
+            # Key Topics
+            if llm_analysis.get('topics'):
+                content.append("## Key Topics")
+                content.append("")
+                for idx, topic in enumerate(llm_analysis['topics'], 1):
+                    content.append(f"{idx}. {topic}")
+                content.append("")
+
+            # Keywords
+            if llm_analysis.get('keywords'):
+                content.append("## Keywords")
+                content.append("")
+                content.append(", ".join(llm_analysis['keywords']))
+                content.append("")
+
         # Description
         if episode_data['description']:
             content.append("## Description")
@@ -464,9 +675,9 @@ whisper "{media_file_path}" --output_format txt
             content.append(episode_data['description'])
             content.append("")
         
-        # Summary if different from description
+        # Episode Notes (from RSS) if different from description
         if episode_data['summary'] and episode_data['summary'] != episode_data['description']:
-            content.append("## Summary")
+            content.append("## Episode Notes")
             content.append("")
             content.append(episode_data['summary'])
             content.append("")
@@ -515,10 +726,20 @@ whisper "{media_file_path}" --output_format txt
             try:
                 # Transcribe media file
                 transcription = self.transcribe_with_whisper(media_file)
-                
+
+                # Analyze transcript with LLM (if configured)
+                llm_analysis = None
+                if self.llm_provider != "none":
+                    llm_analysis = self.analyze_transcript_with_llm(transcription)
+
+                    if llm_analysis:
+                        print(f"✓ LLM analysis completed successfully")
+                    else:
+                        print(f"⚠ LLM analysis failed or was skipped")
+
                 # Create markdown file
-                markdown_file = self.create_markdown_file(episode_data, transcription, media_url)
-                
+                markdown_file = self.create_markdown_file(episode_data, transcription, media_url, llm_analysis)
+
                 return markdown_file
                 
             finally:
@@ -566,10 +787,32 @@ def main():
         default=2.0,
         help="Minimum pause in seconds to create a new paragraph in transcription (default: 2.0)"
     )
+    parser.add_argument(
+        "--llm-provider",
+        choices=["ollama", "claude", "none"],
+        default="none",
+        help="LLM provider for post-processing analysis (default: none)"
+    )
+    parser.add_argument(
+        "--llm-model",
+        default="llama3.2:3b",
+        help="Ollama model name for analysis (default: llama3.2:3b)"
+    )
+    parser.add_argument(
+        "--ollama-url",
+        default="http://localhost:11434",
+        help="Ollama API URL (default: http://localhost:11434)"
+    )
 
     args = parser.parse_args()
 
-    processor = PodcastProcessor(args.output, args.paragraph_threshold)
+    processor = PodcastProcessor(
+        args.output,
+        args.paragraph_threshold,
+        args.llm_provider,
+        args.llm_model,
+        args.ollama_url
+    )
 
     # If list mode is enabled, just list episodes and exit
     if args.list:
