@@ -1,22 +1,30 @@
+## Product requiremnet
 
-A command-line tool that downloads podcast episodes from RSS feeds and transcribes them using Whisper, optimized for Apple Silicon.
+A command-line tool that downloads podcast episodes from RSS feeds and transcribes them using Whisper, optimized for Apple Silicon. Use Claud AI and its API for further processing and analysis of the transcribed podcast episode.
 
 PodKnow takes a podcast RSS feed URL and:
 1. Downloads the audio/video file for an episode
 2. Transcribes it using **MLX-Whisper** (optimized for Apple M-series chips)
 3. Creates a markdown file with episode metadata and full transcription
 
-PodKnow is implemented with python 3.13
+In order to discover podcasts, and their RSS-feed URL
+- use the public iTunes and Spotify API endpoints to search for podcasts, by title, name of the author or any keywords in the description etc.
+- once podcast are found, list them and their feed UTL for further commands.
 
-It should use a podcast directory like Apple's or Spotify's to search for a particular podcast feed RSS, either using the title, autor or any other keyword in the search.
-Once one/many podcasts are found, the tool will subscribe to them i.e. keep a local file with podasts and their feed URLs to check for new episodes regularly. This is similar to what a "podcatcher" app would do, onyl locally and without any backand service and on the command line.
-For a found podcast, download the media file and transcibe the content, if the language is "english" only.
+Given a podcast RSS-feed URL, list the last n episodes and their episode number or identifier. This identifier will later be used to specify which episode to anlyse.
 
-Create two markdown files for the podcast episode:
-- one with the episode metadata as frontmatter and the original transcription  
-- a markdown file with a version of the transcription that has: a summary of the episode, a list of the topics covered in the episode as a one-sentence and a list of relevant keywords
+With a dedicated command, download the media file and transcibe the content, if the language is "english" only. Detect paragraphs in the transcription by using Whispers built-in function for this. Create a markdown file with metadata as frontmatter and the transcribed text.
 
-Use Claude API for the analysis but also implement the option to have a local LLM, e.g. with Ollama.
+Use Claude API to analyse the transcription in ordert to
+- create a summary of the transcription
+- create a list of topics covered, in one sentence
+- create a list of relevant keywords to label the transcription
+- try to detect "sponsor conten", i.e. narrated adds and mark them in the transciption
 
-All the metadata used to direct the LLM should be in a local markdown file that can be edited without changing the implementation.
+PodKnow is implemented with python 3.13. 
+Create a virtual env for all python modules need.
+The resulting tool and all its dependencies must be installed using pip or uv.
+All the metadata used to direct the LLM and the API calls to Claude should be in a local markdown file that can be edited without changing the implementation.
 
+---
+Now anlyse this PRD and create a requirements, design and list of tasks. Ask questions if aspects of the PRD or for the requirements are not clear or nor specific enough.
