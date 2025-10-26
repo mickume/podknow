@@ -194,13 +194,12 @@ class AnalysisResult:
 ```yaml
 # config.yaml
 podcast_directories:
-  apple_podcasts:
+  itunes:
     enabled: true
-    api_key: ${APPLE_PODCASTS_API_KEY}
+    base_url: https://itunes.apple.com/search
   spotify:
     enabled: true
-    client_id: ${SPOTIFY_CLIENT_ID}
-    client_secret: ${SPOTIFY_CLIENT_SECRET}
+    base_url: https://api.spotify.com/v1
 
 transcription:
   engine: mlx-whisper
@@ -230,10 +229,10 @@ storage:
 
 ## Security Considerations
 
-### API Key Management
-- Environment variable-based configuration
-- Secure storage of authentication credentials
-- API rate limiting and quota management
+### Public API Management
+- No authentication required for iTunes Search API
+- Rate limiting compliance for public endpoints
+- Graceful handling of service availability
 
 ### File System Security
 - Sandboxed output directory operations

@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 from ...exceptions import DiscoveryError, ConfigurationError
 from ...models.podcast import PodcastResult
 from .apple_podcasts import ApplePodcastsClient
-from .spotify import SpotifyClient
+from .spotify import SpotifyPublicClient
 
 
 logger = logging.getLogger(__name__)
@@ -31,9 +31,7 @@ class PodcastDiscovery:
     def __init__(
         self,
         apple_podcasts_enabled: bool = True,
-        spotify_enabled: bool = False,
-        spotify_client_id: Optional[str] = None,
-        spotify_client_secret: Optional[str] = None,
+        spotify_enabled: bool = True,
         timeout: int = 30,
         max_concurrent_searches: int = 3
     ):
@@ -42,14 +40,9 @@ class PodcastDiscovery:
         
         Args:
             apple_podcasts_enabled: Enable Apple Podcasts search
-            spotify_enabled: Enable Spotify search
-            spotify_client_id: Spotify client ID (required if Spotify enabled)
-            spotify_client_secret: Spotify client secret (required if Spotify enabled)
+            spotify_enabled: Enable Spotify public search
             timeout: Request timeout in seconds
             max_concurrent_searches: Maximum concurrent API calls
-            
-        Raises:
-            ConfigurationError: When required credentials are missing
         """
         self.apple_podcasts_enabled = apple_podcasts_enabled
         self.spotify_enabled = spotify_enabled
@@ -58,21 +51,13 @@ class PodcastDiscovery:
         
         # Initialize clients
         self._apple_client: Optional[ApplePodcastsClient] = None
-        self._spotify_client: Optional[SpotifyClient] = None
+        self._spotify_client: Optional[SpotifyPublicClient] = None
         
         if self.apple_podcasts_enabled:
             self._apple_client = ApplePodcastsClient(timeout=timeout)
         
         if self.spotify_enabled:
-            if not spotify_client_id or not spotify_client_secret:
-                raise ConfigurationError(
-                    "Spotify client ID and secret are required when Spotify is enabled"
-                )
-            self._spotify_client = SpotifyClient(
-                client_id=spotify_client_id,
-                client_secret=spotify_client_secret,
-                timeout=timeout
-            )
+            self._spotify_client = SpotifyPublicClient(timeout=timeout)
     
     async def search_podcasts(
         self,

@@ -20,14 +20,14 @@
     - _Requirements: 5.1, 5.2, 5.5_
 
 - [x] 3. Build podcast discovery service
-  - [x] 3.1 Implement Apple Podcasts API integration
-    - Create ApplePodcastsClient class with search functionality
-    - Handle API authentication and rate limiting
-    - Parse and normalize podcast search results
+  - [x] 3.1 Implement iTunes Search API integration
+    - Create iTunesSearchClient class with search functionality using public endpoints
+    - Handle rate limiting and error responses from iTunes Search API
+    - Parse and normalize podcast search results from iTunes format
     - _Requirements: 1.1, 1.2, 1.4_
-  - [x] 3.2 Implement Spotify API integration
-    - Create SpotifyClient class with podcast search capabilities
-    - Handle OAuth2 authentication flow for Spotify API
+  - [x] 3.2 Implement Spotify public API integration
+    - Create SpotifyPublicClient class with podcast search using public endpoints
+    - Handle public API limitations and search without authentication
     - Normalize Spotify results to match common PodcastResult format
     - _Requirements: 1.1, 1.2, 1.4_
   - [x] 3.3 Create unified podcast discovery interface
