@@ -1,95 +1,95 @@
 # Implementation Plan
 
-- [-] 1. Set up project structure and core interfaces
+- [ ] 1. Set up project structure and core interfaces
   - Create Python package structure with proper __init__.py files
   - Set up pyproject.toml with dependencies (mlx-whisper, requests, click, pydantic, etc.)
   - Define core data models using Pydantic for validation
   - Create base interfaces and abstract classes for main components
   - _Requirements: 6.1, 6.2_
 
-- [x] 2. Implement configuration management system
-  - [x] 2.1 Create configuration loader with YAML support
+- [ ] 2. Implement configuration management system
+  - [ ] 2.1 Create configuration loader with YAML support
     - Write ConfigManager class to load and validate settings from config.yaml
     - Implement environment variable substitution for API keys
     - Add configuration validation with clear error messages
     - _Requirements: 5.1, 5.4_
-  - [x] 2.2 Implement template system for LLM prompts
+  - [ ] 2.2 Implement template system for LLM prompts
     - Create TemplateManager class to load and parse markdown template files
     - Add Jinja2 templating support for dynamic content insertion
     - Implement template validation and error handling
     - _Requirements: 5.1, 5.2, 5.5_
 
-- [x] 3. Build podcast discovery service
-  - [x] 3.1 Implement iTunes Search API integration
+- [ ] 3. Build podcast discovery service
+  - [ ] 3.1 Implement iTunes Search API integration
     - Create iTunesSearchClient class with search functionality using public endpoints
     - Handle rate limiting and error responses from iTunes Search API
     - Parse and normalize podcast search results from iTunes format
     - _Requirements: 1.1, 1.2, 1.4_
-  - [x] 3.2 Implement Spotify public API integration
+  - [ ] 3.2 Implement Spotify public API integration
     - Create SpotifyPublicClient class with podcast search using public endpoints
     - Handle public API limitations and search without authentication
     - Normalize Spotify results to match common PodcastResult format
     - _Requirements: 1.1, 1.2, 1.4_
-  - [x] 3.3 Create unified podcast discovery interface
+  - [ ] 3.3 Create unified podcast discovery interface
     - Implement PodcastDiscovery class that aggregates results from multiple sources
     - Add result pagination and filtering capabilities
     - Handle search result ranking and deduplication
     - _Requirements: 1.1, 1.2, 1.5_
 
-- [x] 4. Implement subscription management
-  - [x] 4.1 Create local subscription storage
+- [ ] 4. Implement subscription management
+  - [ ] 4.1 Create local subscription storage
     - Implement SubscriptionManager class with JSON file persistence
     - Add CRUD operations for podcast subscriptions
     - Create subscription data validation and migration logic
     - _Requirements: 2.1, 2.2, 2.3, 2.4_
-  - [x] 4.2 Implement RSS feed parsing and monitoring
+  - [ ] 4.2 Implement RSS feed parsing and monitoring
     - Create RSSFeedParser class to extract episode information
     - Add feed validation and error handling for malformed RSS
     - Implement new episode detection logic comparing against stored data
     - _Requirements: 2.5, 3.1_
 
-- [x] 5. Build media download and processing system
-  - [x] 5.1 Implement robust media downloader
+- [ ] 5. Build media download and processing system
+  - [ ] 5.1 Implement robust media downloader
     - Create MediaDownloader class with progress tracking and resume capability
     - Add support for various audio/video formats (MP3, M4A, MP4, etc.)
     - Implement retry logic with exponential backoff for failed downloads
     - _Requirements: 3.1, 3.4_
-  - [x] 5.2 Integrate MLX-Whisper for transcription
+  - [ ] 5.2 Integrate MLX-Whisper for transcription
     - Create TranscriptionEngine class wrapping MLX-Whisper functionality
     - Implement language detection and English-only filtering
     - Add transcription progress tracking and error handling
     - Optimize for Apple Silicon performance with appropriate model selection
     - _Requirements: 3.2, 3.3, 3.5_
-  - [x] 5.3 Create episode processing orchestrator
+  - [ ] 5.3 Create episode processing orchestrator
     - Implement EpisodeProcessor class coordinating download and transcription
     - Add batch processing capabilities for multiple episodes
     - Create processing status tracking and resume functionality
     - _Requirements: 3.1, 3.2, 6.3_
 
-- [x] 6. Implement AI-powered content analysis
-  - [x] 6.1 Create Claude API integration
+- [ ] 6. Implement AI-powered content analysis
+  - [ ] 6.1 Create Claude API integration
     - Implement ClaudeAnalyzer class for content analysis using Claude API
     - Add API key management and rate limiting handling
     - Create structured prompts for summary, topics, and keyword extraction
     - _Requirements: 4.2, 4.3, 4.4, 5.3_
-  - [x] 6.2 Implement Ollama local LLM support
+  - [ ] 6.2 Implement Ollama local LLM support
     - Create OllamaAnalyzer class for local LLM analysis
     - Add model management and local server communication
     - Implement fallback logic when Claude API is unavailable
     - _Requirements: 5.3, 5.4_
-  - [x] 6.3 Build content analysis orchestrator
+  - [ ] 6.3 Build content analysis orchestrator
     - Create ContentAnalyzer class that manages AI provider selection
     - Implement template-driven analysis with configurable prompts
     - Add analysis result validation and error handling
     - _Requirements: 4.2, 4.3, 4.4, 5.1, 5.5_
 
-- [x] 7. Create markdown file generation system
-  - [x] 7.1 Implement original transcription markdown generator
+- [ ] 7. Create markdown file generation system
+  - [ ] 7.1 Implement original transcription markdown generator
     - Create MarkdownGenerator class for episode metadata and transcription files
     - Add frontmatter generation with episode metadata (title, date, duration, etc.)
     - Format transcription text with proper markdown structure
     - _Requirements: 4.1_
-  - [x] 7.2 Implement enhanced analysis markdown generator
+  - [ ] 7.2 Implement enhanced analysis markdown generator
     - Extend MarkdownGenerator to create analysis files with summaries
     - Add structured topic lists with one-sentence descriptions
     - Include keyword lists and additional metadata in enhanced files
