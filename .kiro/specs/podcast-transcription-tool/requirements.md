@@ -7,7 +7,7 @@ PodKnow is a command-line podcast management and transcription tool that enables
 ## Glossary
 
 - **PodKnow**: The command-line podcast transcription tool system
-- **Podcast_Directory**: External podcast discovery services (Apple Podcasts, Spotify)
+- **Podcast_Directory**: Public podcast discovery endpoints (iTunes Search API, Spotify Web API public endpoints)
 - **RSS_Feed**: XML feed containing podcast episode metadata and media URLs
 - **MLX_Whisper**: Apple Silicon-optimized speech-to-text transcription engine
 - **Subscription_Manager**: Local component managing subscribed podcast feeds
@@ -26,7 +26,7 @@ PodKnow is a command-line podcast management and transcription tool that enables
 1. WHEN a user provides search terms, THE Podcast_Directory SHALL return matching podcast results with metadata
 2. THE PodKnow SHALL display search results including podcast title, author, and description
 3. THE PodKnow SHALL support search queries containing multiple keywords
-4. THE PodKnow SHALL integrate with Apple Podcasts and Spotify directory APIs
+4. THE PodKnow SHALL integrate with public iTunes Search API and Spotify Web API endpoints without requiring API keys
 5. WHERE search results exceed ten items, THE PodKnow SHALL paginate results
 
 ### Requirement 2

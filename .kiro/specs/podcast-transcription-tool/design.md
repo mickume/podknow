@@ -49,12 +49,12 @@ graph TB
   - `list_subscriptions() -> List[Subscription]`
 
 ### Podcast Discovery Service
-- **Purpose**: Interface with external podcast directories for search functionality
+- **Purpose**: Interface with public podcast directory endpoints for search functionality
 - **Key Methods**:
-  - `search_apple_podcasts(query: str) -> List[PodcastResult]`
-  - `search_spotify_podcasts(query: str) -> List[PodcastResult]`
+  - `search_itunes(query: str) -> List[PodcastResult]`
+  - `search_spotify_public(query: str) -> List[PodcastResult]`
   - `get_rss_feed(podcast_url: str) -> RSSFeed`
-- **External Dependencies**: Apple Podcasts API, Spotify Web API
+- **External Dependencies**: iTunes Search API (public), Spotify Web API (public endpoints)
 
 ### Subscription Manager
 - **Purpose**: Local podcast subscription and feed management
