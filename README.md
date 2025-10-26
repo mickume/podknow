@@ -1,63 +1,75 @@
 # PodKnow
 
-A command-line podcast management and transcription tool optimized for Apple Silicon.
+A command-line podcast transcription and analysis tool optimized for Apple Silicon.
 
 ## Features
 
-- Discover podcasts from Apple Podcasts and Spotify
-- Subscribe to and manage podcast feeds locally
-- Download and transcribe episodes using MLX-Whisper
-- AI-powered content analysis with Claude API and Ollama
-- Generate structured markdown files with episode content
-- Configurable templates for customized analysis
-
-## Requirements
-
-- Python 3.13+
-- macOS with Apple Silicon (M1/M2/M3)
-- MLX-Whisper for transcription
+- **Podcast Discovery**: Search across iTunes and Spotify APIs
+- **Episode Management**: List and select episodes from RSS feeds  
+- **Audio Transcription**: MLX-Whisper powered transcription for Apple Silicon
+- **AI Analysis**: Claude AI powered content analysis and summarization
+- **Configurable Prompts**: Customizable AI prompts via markdown configuration
 
 ## Installation
 
+### Requirements
+
+- Python 3.13+
+- Apple Silicon Mac (for MLX-Whisper optimization)
+- Claude AI API key
+
+### Install with pip
+
 ```bash
+# Create virtual environment
+python3.13 -m venv podknow-env
+source podknow-env/bin/activate
+
+# Install package
 pip install -e .
 ```
 
-## Quick Start
+### Install with uv (recommended)
+
+```bash
+# Create virtual environment
+python3.13 -m venv podknow-env
+source podknow-env/bin/activate
+
+# Install with uv (faster)
+uv pip install -e .
+```
+
+## Usage
 
 ```bash
 # Search for podcasts
-podknow search "python programming"
+podknow search "machine learning"
 
-# Subscribe to a podcast
-podknow subscribe <podcast-id>
+# List recent episodes
+podknow list-episodes "https://example.com/podcast.rss" --count 5
 
-# Process new episodes
-podknow update
+# Transcribe an episode
+podknow transcribe episode_123
 
-# Analyze episode content
-podknow analyze <episode-id>
+# Analyze existing transcription
+podknow analyze transcription.md
 ```
 
 ## Configuration
 
-Create a configuration file at `~/.podknow/config.yaml`:
+Create a configuration file at `~/.podknow/config.md` with your API keys and custom prompts.
 
-```yaml
-podcast_directories:
-  apple_podcasts:
-    enabled: true
-    api_key: ${APPLE_PODCASTS_API_KEY}
-  spotify:
-    enabled: true
-    client_id: ${SPOTIFY_CLIENT_ID}
-    client_secret: ${SPOTIFY_CLIENT_SECRET}
+## Project Structure
 
-ai_analysis:
-  primary_provider: claude
-  claude:
-    api_key: ${CLAUDE_API_KEY}
-    model: claude-3-sonnet
+```
+podknow/
+├── __init__.py
+├── models/           # Data models and type definitions
+├── services/         # Business logic services
+├── cli/             # Command-line interface
+├── config/          # Configuration management
+└── exceptions.py    # Custom exception hierarchy
 ```
 
 ## Development
@@ -70,8 +82,7 @@ pip install -e ".[dev]"
 pytest
 
 # Format code
-black podknow/
-isort podknow/
+black .
 
 # Type checking
 mypy podknow/
@@ -79,4 +90,4 @@ mypy podknow/
 
 ## License
 
-MIT
+MIT License

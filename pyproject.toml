@@ -1,0 +1,162 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "podknow"
+version = "0.1.0"
+description = "Command-line podcast transcription and analysis tool"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "PodKnow Team", email = "team@podknow.dev"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Text Processing :: Linguistic",
+]
+keywords = ["podcast", "transcription", "ai", "analysis", "mlx", "whisper", "claude"]
+requires-python = ">=3.13"
+
+dependencies = [
+    # Core application
+    "click>=8.0.0",
+    "requests>=2.28.0", 
+    "feedparser>=6.0.0",
+    "pydantic>=2.0.0",
+    
+    # Audio processing (Apple Silicon optimized)
+    "mlx-whisper>=0.1.0; platform_machine=='arm64'",
+    "openai-whisper>=20231117; platform_machine!='arm64'",
+    "librosa>=0.10.0",
+    "soundfile>=0.12.0",  # Required for audio file handling
+    
+    # AI integration
+    "anthropic>=0.8.0",
+    
+    # Utilities
+    "python-dateutil>=2.8.0",
+    "pyyaml>=6.0.0",
+    "rich>=13.0.0",  # For better CLI output formatting
+    "tqdm>=4.64.0",  # Progress bars for downloads
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-mock>=3.10.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+    "pre-commit>=3.0.0",
+]
+
+test = [
+    "pytest>=7.0.0",
+    "pytest-mock>=3.10.0", 
+    "pytest-cov>=4.0.0",
+]
+
+# Apple Silicon optimized dependencies
+apple-silicon = [
+    "mlx>=0.0.6",
+    "mlx-whisper>=0.1.0",
+]
+
+# Alternative dependencies for non-Apple Silicon
+standard = [
+    "openai-whisper>=20231117",
+    "torch>=2.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/podknow/podknow"
+Repository = "https://github.com/podknow/podknow"
+Documentation = "https://podknow.readthedocs.io"
+"Bug Tracker" = "https://github.com/podknow/podknow/issues"
+
+[project.scripts]
+podknow = "podknow.cli.main:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["podknow*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py313']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--verbose",
+    "--cov=podknow",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
