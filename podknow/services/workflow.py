@@ -460,8 +460,8 @@ class WorkflowOrchestrator:
                     if not output_dir:
                         output_dir = os.path.expanduser("~/Documents/PodKnow")
                     os.makedirs(output_dir, exist_ok=True)
-                    
-                    filename = self.transcription_service._generate_filename(episode_metadata)
+
+                    filename = self.transcription_service.generate_filename(episode_metadata)
                     output_path = os.path.join(output_dir, filename)
                     
                     with open(output_path, 'w', encoding='utf-8') as f:

@@ -57,15 +57,15 @@ Quick reference checklist for tracking issue resolution.
   - Files: `transcription.py`, `rss.py`, `manager.py`
   - Effort: 1.5 hours
 
-- [ ] **ISSUE-010**: Reduce Coupling Between Workflow and Service Internals
+- [x] **ISSUE-010**: Reduce Coupling Between Workflow and Service Internals ✅ **FIXED (2025-10-27)**
   - Files: `workflow.py`, `transcription.py`
   - Effort: 1 hour
 
-- [ ] **ISSUE-011**: Weak Audio File Format Validation
+- [x] **ISSUE-011**: Weak Audio File Format Validation ✅ **FIXED (2025-10-27)**
   - Files: `transcription.py`
   - Effort: 2 hours
 
-- [ ] **ISSUE-012**: Language Detection Requirement Not Enforced Per PRD
+- [x] **ISSUE-012**: Language Detection Requirement Not Enforced Per PRD ✅ **FIXED (2025-10-27)**
   - Files: `prd.md`, `main.py`, `workflow.py`
   - Effort: 1.5 hours
 
@@ -174,9 +174,9 @@ Quick reference checklist for tracking issue resolution.
 |----------|-------|------|------------|
 | Critical | 3     | 3    | 100%✅     |
 | High     | 5     | 5    | 100%✅     |
-| Medium   | 10    | 6    | 60%        |
+| Medium   | 10    | 9    | 90%        |
 | Low      | 9     | 3    | 33%        |
-| **Total**| **27**| **17**| **63%**   |
+| **Total**| **27**| **20**| **74%**   |
 
 **Note:** Total excludes 5 enhancement issues in backlog (ISSUE-020 through ISSUE-024)
 
@@ -190,7 +190,10 @@ Quick reference checklist for tracking issue resolution.
 - ✅ ISSUE-007: Inconsistent Error Handling Across CLI Commands (High)
 - ✅ ISSUE-008: Replace Print Statements with Proper Logging (Medium)
 - ✅ ISSUE-009: Extract Magic Numbers to Named Constants (Medium)
-- ✅ ISSUE-013: String Formatting Inconsistency (Medium) 🎯 **New!**
+- ✅ ISSUE-010: Reduce Coupling Between Workflow and Service Internals (Medium) 🎯 **New!**
+- ✅ ISSUE-011: Weak Audio File Format Validation (Medium) 🎯 **New!**
+- ✅ ISSUE-012: Language Detection Requirement Not Enforced Per PRD (Medium) 🎯 **New!**
+- ✅ ISSUE-013: String Formatting Inconsistency (Medium)
 - ✅ ISSUE-025: Analysis Service Topic Validation Too Strict (High)
 - ✅ ISSUE-027: Setup Command Test Isolation Problem (Medium)
 - ✅ ISSUE-028: Keyboard Interrupt Exit Code Incorrect (Medium)

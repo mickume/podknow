@@ -108,7 +108,11 @@ class TranscriptionService:
             # Validate downloaded file
             if not os.path.exists(temp_file_path) or os.path.getsize(temp_file_path) == 0:
                 raise FileOperationError("Downloaded file is empty or does not exist")
-            
+
+            # Validate audio content can be decoded
+            logger.info("Validating audio file...")
+            self._validate_audio_file(temp_file_path)
+
             return temp_file_path
             
         except requests.RequestException as e:
@@ -119,29 +123,74 @@ class TranscriptionService:
     def _is_audio_content(self, content_type: str, filename: str) -> bool:
         """
         Validate if content is audio based on content-type and file extension.
-        
+
         Args:
             content_type: HTTP content-type header
             filename: Name of the file
-            
+
         Returns:
             bool: True if content appears to be audio
         """
         # Check content type
         if content_type and content_type.startswith('audio/'):
             return True
-        
+
         # Check file extension
         file_ext = Path(filename).suffix.lower()
         if file_ext in self.supported_formats:
             return True
-        
+
         # Check MIME type by extension
         guessed_type, _ = mimetypes.guess_type(filename)
         if guessed_type and guessed_type.startswith('audio/'):
             return True
-        
+
         return False
+
+    def _validate_audio_file(self, file_path: str) -> bool:
+        """
+        Validate that audio file can be decoded and contains valid audio data.
+
+        Args:
+            file_path: Path to the audio file
+
+        Returns:
+            bool: True if audio file is valid
+
+        Raises:
+            AudioProcessingError: If audio file is corrupted or invalid
+        """
+        try:
+            import librosa
+
+            # Try to load just the first second to validate
+            # This is fast and catches most corruption issues
+            y, sr = librosa.load(file_path, duration=1.0, sr=None, mono=True)
+
+            # Basic sanity checks
+            if len(y) == 0:
+                raise AudioProcessingError(
+                    f"Audio file appears to be empty or corrupted: {file_path}"
+                )
+
+            if sr == 0 or sr is None:
+                raise AudioProcessingError(
+                    f"Audio file has invalid sample rate: {file_path}"
+                )
+
+            logger.debug(f"Audio validation passed: {len(y)} samples at {sr}Hz")
+            return True
+
+        except ImportError:
+            # If librosa is not available, skip validation
+            logger.warning("librosa not available, skipping deep audio validation")
+            return True
+
+        except Exception as e:
+            # Catch librosa-specific errors and audio format errors
+            raise AudioProcessingError(
+                f"Audio file validation failed for {file_path}: {str(e)}"
+            )
     
     def detect_language(self, audio_path: str, skip_minutes: float = DEFAULT_LANGUAGE_DETECTION_SKIP_MINUTES, sample_duration: float = LANGUAGE_DETECTION_SAMPLE_DURATION) -> str:
         """
@@ -673,26 +722,26 @@ class TranscriptionService:
         except OSError as e:
             raise FileOperationError(f"Failed to generate output file: {str(e)}")
     
-    def _generate_filename(self, episode_metadata: EpisodeMetadata) -> str:
+    def generate_filename(self, episode_metadata: EpisodeMetadata) -> str:
         """
         Generate filename based on episode metadata.
-        
+
         Args:
             episode_metadata: Episode metadata
-            
+
         Returns:
             str: Generated filename
         """
         # Clean podcast title for filename
         podcast_title = self._sanitize_filename(episode_metadata.podcast_title)
-        
+
         # Use episode number if available, otherwise use date
         if episode_metadata.episode_number:
             episode_part = f"ep{episode_metadata.episode_number:03d}"
         else:
             date_str = episode_metadata.publication_date.strftime("%Y%m%d")
             episode_part = f"episode_{date_str}"
-        
+
         return f"{podcast_title}_{episode_part}.md"
     
     def _sanitize_filename(self, filename: str) -> str:

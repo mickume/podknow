@@ -13,7 +13,7 @@ In order to discover podcasts, and their RSS-feed URL
 
 Given a podcast RSS-feed URL, list the last n episodes and their episode number or identifier. This identifier will later be used to specify which episode to anlyse.
 
-With a dedicated command, download the media file and transcibe the content, if the language is "english" only. Detect paragraphs in the transcription by using Whispers built-in function for this. Create a markdown file with metadata as frontmatter and the transcribed text.
+With a dedicated command, download the media file and transcribe the content. By default, detect and verify the language is English before transcribing (this can be skipped with a flag if needed). Detect paragraphs in the transcription by using Whisper's built-in function for this. Create a markdown file with metadata as frontmatter and the transcribed text.
 
 Use Claude API to analyse the transcription in ordert to
 - create a summary of the transcription

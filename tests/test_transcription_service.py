@@ -45,7 +45,8 @@ class TestAudioDownload:
         self.service = TranscriptionService()
     
     @patch('requests.get')
-    def test_successful_audio_download(self, mock_get):
+    @patch.object(TranscriptionService, '_validate_audio_file')
+    def test_successful_audio_download(self, mock_validate, mock_get):
         """Test successful audio file download."""
         # Mock successful response
         mock_response = Mock()
@@ -56,19 +57,25 @@ class TestAudioDownload:
         mock_response.iter_content.return_value = [b'fake audio data']
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
-        
+
+        # Mock validation to pass
+        mock_validate.return_value = True
+
         with tempfile.TemporaryDirectory() as temp_dir:
             service = TranscriptionService(temp_dir=temp_dir)
-            
+
             result_path = service.download_audio("https://example.com/audio.mp3")
-            
+
             assert os.path.exists(result_path)
             assert result_path.endswith('.mp3')
-            
+
             # Verify file content
             with open(result_path, 'rb') as f:
                 content = f.read()
                 assert content == b'fake audio data'
+
+            # Verify validation was called
+            mock_validate.assert_called_once()
     
     @patch('requests.get')
     def test_download_network_error(self, mock_get):
@@ -297,9 +304,9 @@ class TestOutputGeneration:
     
     def test_filename_generation(self):
         """Test markdown filename generation."""
-        filename = self.service._generate_filename(self.episode_metadata)
+        filename = self.service.generate_filename(self.episode_metadata)
         assert filename == "test_podcast_ep001.md"
-        
+
         # Test without episode number
         metadata_no_number = EpisodeMetadata(
             podcast_title="Test Podcast",
@@ -310,7 +317,7 @@ class TestOutputGeneration:
             description="Test description",
             audio_url="https://example.com/audio.mp3"
         )
-        filename = self.service._generate_filename(metadata_no_number)
+        filename = self.service.generate_filename(metadata_no_number)
         assert filename == "test_podcast_episode_20240115.md"
     
     def test_filename_sanitization(self):
