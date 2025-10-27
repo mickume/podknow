@@ -15,12 +15,13 @@ import yaml
 from ..models.transcription import TranscriptionResult, TranscriptionSegment
 from ..models.episode import EpisodeMetadata
 from ..exceptions import (
-    TranscriptionError, 
-    AudioProcessingError, 
+    TranscriptionError,
+    AudioProcessingError,
     LanguageDetectionError,
     FileOperationError,
     NetworkError
 )
+from ..utils.progress import ProgressContext
 
 
 class TranscriptionService:
@@ -134,7 +135,7 @@ class TranscriptionService:
         
         return False
     
-    def detect_language(self, audio_path: str, skip_minutes: float = 2.0, sample_duration: float = 30.0, suppress_progress: bool = False) -> str:
+    def detect_language(self, audio_path: str, skip_minutes: float = 2.0, sample_duration: float = 30.0) -> str:
         """
         Detect the language of the audio file using MLX-Whisper.
         Skips the first few minutes to avoid ads/intros in different languages.
@@ -167,7 +168,7 @@ class TranscriptionService:
             sample_path = self._create_audio_sample(audio_path, skip_minutes, sample_duration)
             
             try:
-                if not suppress_progress:
+                if ProgressContext.should_show_progress():
                     # Show progress for language detection
                     from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
                     import threading
@@ -329,7 +330,7 @@ class TranscriptionService:
         except Exception as e:
             raise AudioProcessingError(f"Failed to create audio sample: {str(e)}")
     
-    def transcribe_audio(self, audio_path: str, suppress_progress: bool = False) -> TranscriptionResult:
+    def transcribe_audio(self, audio_path: str) -> TranscriptionResult:
         """
         Transcribe audio file using MLX-Whisper with paragraph detection.
         
@@ -357,14 +358,14 @@ class TranscriptionService:
             
             # Record start time for performance metrics
             start_time = time.time()
-            
-            if not suppress_progress:
+
+            if ProgressContext.should_show_progress():
                 print(f"Starting transcription of {audio_path}...")
-            
+
             # Get audio duration for progress estimation
             audio_duration = self._get_audio_duration(audio_path)
-            
-            if not suppress_progress:
+
+            if ProgressContext.should_show_progress():
                 # Create progress bar for transcription
                 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn, BarColumn
                 import threading

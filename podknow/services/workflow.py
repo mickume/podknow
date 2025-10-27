@@ -18,6 +18,7 @@ from ..models.podcast import PodcastResult, PodcastMetadata
 from ..models.transcription import TranscriptionResult
 from ..models.analysis import AnalysisResult
 from ..models.output import OutputDocument
+from ..utils.progress import ProgressContext
 from ..services.discovery import PodcastDiscoveryService
 from ..services.episode import EpisodeListingService
 from ..services.transcription import TranscriptionService
@@ -217,7 +218,7 @@ class WorkflowOrchestrator:
                         'summary': config.prompts.get('summary'),
                         'topics': config.prompts.get('topics'),
                         'keywords': config.prompts.get('keywords'),
-                        'sponsors': config.prompts.get('sponsor_detection')  # Config uses 'sponsor_detection'
+                        'sponsor_detection': config.prompts.get('sponsor_detection')
                     }
                     # Filter out None values
                     prompts = {k: v for k, v in prompts.items() if v is not None}
@@ -643,11 +644,13 @@ class WorkflowOrchestrator:
     
     def _detect_language_with_progress(self, audio_path: str, skip_minutes: float) -> str:
         """Detect language without showing individual progress bars."""
-        return self.transcription_service.detect_language(audio_path, skip_minutes, suppress_progress=True)
+        with ProgressContext.suppress():
+            return self.transcription_service.detect_language(audio_path, skip_minutes)
     
     def _transcribe_with_progress(self, audio_path: str):
         """Transcribe audio without showing individual progress bars."""
-        return self.transcription_service.transcribe_audio(audio_path, suppress_progress=True)
+        with ProgressContext.suppress():
+            return self.transcription_service.transcribe_audio(audio_path)
     
     def _analyze_with_progress(self, transcription_text: str, claude_api_key: str, 
                              progress, task):

@@ -12,6 +12,7 @@ from datetime import datetime
 from ..exceptions import PodKnowError, NetworkError, AnalysisError
 from ..services.workflow import WorkflowOrchestrator
 from ..config.manager import ConfigManager
+from ..utils.cli_errors import handle_cli_errors
 
 
 def _ensure_config_exists(verbose: bool = False):
@@ -132,6 +133,7 @@ def cli(ctx: click.Context, verbose: bool, log_file: Optional[str]):
     help="Maximum number of results to return (default: 20)"
 )
 @click.pass_context
+@handle_cli_errors
 def search(ctx: click.Context, keywords: str, platform: str, limit: int):
     """
     Search for podcasts by keywords across multiple platforms.
@@ -721,53 +723,6 @@ def verbose_echo(ctx: click.Context, message: str):
 def progress_echo(message: str, nl: bool = True):
     """Echo progress message to stderr."""
     click.echo(f"[INFO] {message}", err=True, nl=nl)
-
-
-@cli.command()
-@click.option(
-    "--force", "-f",
-    is_flag=True,
-    help="Overwrite existing configuration file"
-)
-@click.pass_context
-def setup(ctx: click.Context, force: bool):
-    """
-    Create or reset the PodKnow configuration file.
-    
-    This command creates a default configuration file at ~/.podknow/config.md
-    with example prompts and settings. Use --force to overwrite an existing file.
-    """
-    try:
-        config_manager = ConfigManager()
-        
-        if config_manager.config_exists() and not force:
-            click.echo(f"Configuration file already exists at: {config_manager.config_path}")
-            click.echo("Use --force to overwrite the existing configuration.")
-            click.echo("Or edit the existing file directly:")
-            click.echo(f"  nano {config_manager.config_path}")
-            return
-        
-        # Create the configuration
-        config_manager.create_default_config()
-        
-        click.echo("✅ Configuration file created successfully!")
-        click.echo(f"📁 Location: {config_manager.config_path}")
-        click.echo()
-        click.echo("🔧 Next steps:")
-        click.echo("1. Add your Claude API key to the configuration file")
-        click.echo("   - Get an API key from: https://console.anthropic.com/")
-        click.echo("2. Optionally add Spotify credentials for enhanced search")
-        click.echo("3. Customize the analysis prompts for your use case")
-        click.echo()
-        click.echo("📝 Edit configuration:")
-        click.echo(f"  nano {config_manager.config_path}")
-        click.echo()
-        click.echo("🔍 Check configuration status:")
-        click.echo("  podknow config-status")
-        
-    except Exception as e:
-        error_echo(f"Failed to create configuration: {e}")
-        sys.exit(1)
 
 
 def error_echo(message: str):
