@@ -132,22 +132,26 @@ class TestLanguageDetection:
         self.service = TranscriptionService()
     
     @patch('mlx_whisper.transcribe')
-    def test_english_language_detection(self, mock_transcribe):
+    @patch.object(TranscriptionService, '_create_audio_sample')
+    def test_english_language_detection(self, mock_create_sample, mock_transcribe):
         """Test successful English language detection."""
+        mock_create_sample.return_value = "/tmp/sample.mp3"
         mock_transcribe.return_value = {'language': 'en'}
-        
+
         with tempfile.NamedTemporaryFile(suffix='.mp3') as temp_file:
-            result = self.service.detect_language(temp_file.name)
+            result = self.service.detect_language(temp_file.name, suppress_progress=True)
             assert result == 'en'
     
     @patch('mlx_whisper.transcribe')
-    def test_non_english_language_rejection(self, mock_transcribe):
+    @patch.object(TranscriptionService, '_create_audio_sample')
+    def test_non_english_language_rejection(self, mock_create_sample, mock_transcribe):
         """Test rejection of non-English content."""
+        mock_create_sample.return_value = "/tmp/sample.mp3"
         mock_transcribe.return_value = {'language': 'es'}
-        
+
         with tempfile.NamedTemporaryFile(suffix='.mp3') as temp_file:
             with pytest.raises(LanguageDetectionError, match="Non-English content detected"):
-                self.service.detect_language(temp_file.name)
+                self.service.detect_language(temp_file.name, suppress_progress=True)
     
     def test_language_detection_missing_file(self):
         """Test language detection with missing file."""
@@ -155,13 +159,15 @@ class TestLanguageDetection:
             self.service.detect_language("/nonexistent/file.mp3")
     
     @patch('mlx_whisper.transcribe')
-    def test_language_detection_mlx_error(self, mock_transcribe):
+    @patch.object(TranscriptionService, '_create_audio_sample')
+    def test_language_detection_mlx_error(self, mock_create_sample, mock_transcribe):
         """Test language detection with MLX-Whisper error."""
+        mock_create_sample.return_value = "/tmp/sample.mp3"
         mock_transcribe.side_effect = Exception("MLX error")
-        
+
         with tempfile.NamedTemporaryFile(suffix='.mp3') as temp_file:
             with pytest.raises(LanguageDetectionError, match="Language detection failed"):
-                self.service.detect_language(temp_file.name)
+                self.service.detect_language(temp_file.name, suppress_progress=True)
 
 
 class TestTranscription:

@@ -298,6 +298,11 @@ class TestWorkflowOrchestrator:
             mock_transcribe.return_value = sample_transcription_result
             
             mock_analysis = Mock()
+            # Mock all methods called by analyze_transcription
+            mock_analysis.generate_summary.return_value = sample_analysis_result.summary
+            mock_analysis.extract_topics.return_value = sample_analysis_result.topics
+            mock_analysis.identify_keywords.return_value = sample_analysis_result.keywords
+            mock_analysis.detect_sponsor_content.return_value = sample_analysis_result.sponsor_segments
             mock_analysis.analyze_transcription.return_value = sample_analysis_result
             mock_analysis.generate_markdown_output.return_value = "# Test Output\n\nContent here"
             mock_analysis_service.return_value = mock_analysis

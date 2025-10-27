@@ -114,7 +114,7 @@ class TestAnalysisService:
     def test_init_with_api_key(self, mock_client_class):
         """Test initializing service with API key."""
         service = AnalysisService("test-api-key")
-        mock_client_class.assert_called_once_with("test-api-key")
+        mock_client_class.assert_called_once_with("test-api-key", model='claude-sonnet-4-20250514')
         assert service.prompts is not None
     
     @patch('podknow.services.analysis.ClaudeAPIClient')
@@ -129,8 +129,8 @@ class TestAnalysisService:
         with patch('podknow.services.analysis.ClaudeAPIClient'):
             service = AnalysisService("test-api-key")
             prompts = service._get_default_prompts()
-            
-            required_keys = ["summary", "topics", "keywords", "sponsors"]
+
+            required_keys = ["summary", "topics", "keywords", "sponsor_detection"]
             for key in required_keys:
                 assert key in prompts
                 assert isinstance(prompts[key], str)
@@ -339,10 +339,10 @@ class TestAnalysisService:
         )
         
         markdown = service.generate_markdown_output(output_doc)
-        
+
         # Check that sponsor markers are present
-        assert "**[SPONSOR CONTENT START - 90% confidence]**" in markdown
-        assert "**[SPONSOR CONTENT END]**" in markdown
+        assert "**[SPONSOR START - 90%]**" in markdown
+        assert "**[SPONSOR END]**" in markdown
     
     @patch('podknow.services.analysis.ClaudeAPIClient')
     def test_generate_frontmatter(self, mock_client_class):

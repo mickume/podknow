@@ -38,6 +38,23 @@ def temp_config_dir():
 
 
 @pytest.fixture
+def temp_home(tmp_path, monkeypatch):
+    """Provide temporary home directory for tests to avoid modifying real user config."""
+    temp_home_dir = tmp_path / "home"
+    temp_home_dir.mkdir()
+    monkeypatch.setenv("HOME", str(temp_home_dir))
+    return temp_home_dir
+
+
+@pytest.fixture
+def clean_config(temp_home):
+    """Ensure clean config state for tests using isolated home directory."""
+    config_dir = temp_home / ".podknow"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    return config_dir
+
+
+@pytest.fixture
 def mock_platform_info():
     """Mock platform information for testing"""
     return {

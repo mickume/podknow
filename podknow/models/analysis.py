@@ -2,7 +2,7 @@
 Analysis-related data models.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List
 
 
@@ -27,17 +27,13 @@ class SponsorSegment:
 @dataclass
 class AnalysisResult:
     """Represents the complete AI analysis result."""
-    
+
     summary: str
-    topics: List[str]
-    keywords: List[str]
-    sponsor_segments: List[SponsorSegment]
-    
+    topics: List[str] = field(default_factory=list)
+    keywords: List[str] = field(default_factory=list)
+    sponsor_segments: List[SponsorSegment] = field(default_factory=list)
+
     def __post_init__(self):
         """Validate analysis result."""
-        if not self.summary.strip():
-            raise ValueError("Summary cannot be empty")
-        if not self.topics:
-            raise ValueError("At least one topic is required")
-        if not self.keywords:
-            raise ValueError("At least one keyword is required")
+        if not self.summary or not self.summary.strip():
+            raise ValueError("Summary is required and cannot be empty")

@@ -256,25 +256,29 @@ class TestAnalysisResult:
         assert len(result.topics) == 3
         assert len(result.keywords) == 3
     
-    def test_empty_topics_raises_error(self):
-        """Test that empty topics list raises ValueError."""
-        with pytest.raises(ValueError, match="At least one topic is required"):
-            AnalysisResult(
-                summary="Test summary",
-                topics=[],
-                keywords=["test"],
-                sponsor_segments=[]
-            )
+    def test_empty_topics_allowed(self):
+        """Test that empty topics list is allowed (topics are optional)."""
+        result = AnalysisResult(
+            summary="Test summary",
+            topics=[],
+            keywords=["test"],
+            sponsor_segments=[]
+        )
+        assert result.summary == "Test summary"
+        assert result.topics == []
+        assert len(result.keywords) == 1
     
-    def test_empty_keywords_raises_error(self):
-        """Test that empty keywords list raises ValueError."""
-        with pytest.raises(ValueError, match="At least one keyword is required"):
-            AnalysisResult(
-                summary="Test summary",
-                topics=["test"],
-                keywords=[],
-                sponsor_segments=[]
-            )
+    def test_empty_keywords_allowed(self):
+        """Test that empty keywords list is allowed (keywords are optional)."""
+        result = AnalysisResult(
+            summary="Test summary",
+            topics=["test"],
+            keywords=[],
+            sponsor_segments=[]
+        )
+        assert result.summary == "Test summary"
+        assert len(result.topics) == 1
+        assert result.keywords == []
 
 
 class TestOutputDocument:

@@ -5,10 +5,11 @@ Main CLI interface for PodKnow application.
 import click
 import sys
 import os
+import signal
 from typing import Optional
 from datetime import datetime
 
-from ..exceptions import PodKnowError, NetworkError
+from ..exceptions import PodKnowError, NetworkError, AnalysisError
 from ..services.workflow import WorkflowOrchestrator
 from ..config.manager import ConfigManager
 
@@ -105,8 +106,15 @@ def cli(ctx: click.Context, verbose: bool, log_file: Optional[str]):
                 click.echo(f"Unexpected error: {exc_value}", err=True)
                 click.echo("Use --verbose for detailed error information.", err=True)
                 sys.exit(1)
-    
+
     sys.excepthook = handle_exception
+
+    # Set up signal handler for SIGINT (Ctrl+C)
+    def sigint_handler(signum, frame):
+        click.echo("\nOperation cancelled by user.", err=True)
+        sys.exit(130)
+
+    signal.signal(signal.SIGINT, sigint_handler)
 
 
 @cli.command()
@@ -206,7 +214,7 @@ def search(ctx: click.Context, keywords: str, platform: str, limit: int):
         error_echo("An unexpected error occurred during search")
         if ctx.obj.get('verbose', False):
             raise
-        raise click.ClickException("An unexpected error occurred during search")
+        raise SystemExit(1)
 
 
 @cli.command("list")
@@ -313,7 +321,7 @@ def list_episodes(ctx: click.Context, rss_url: str, count: int, show_description
         error_echo("An unexpected error occurred while listing episodes")
         if ctx.obj.get('verbose', False):
             raise
-        raise click.ClickException("An unexpected error occurred while listing episodes")
+        raise SystemExit(1)
 
 
 @cli.command()
@@ -442,7 +450,7 @@ def transcribe(
         error_echo("An unexpected error occurred during transcription")
         if ctx.obj.get('verbose', False):
             raise
-        raise click.ClickException("An unexpected error occurred during transcription")
+        raise SystemExit(1)
 
 
 @cli.command()
@@ -529,7 +537,7 @@ def analyze(
         error_echo("An unexpected error occurred during analysis")
         if ctx.obj.get('verbose', False):
             raise
-        raise click.ClickException("An unexpected error occurred during analysis")
+        raise SystemExit(1)
 
 
 @cli.command()
@@ -597,7 +605,7 @@ def setup(ctx: click.Context, force: bool):
         error_echo("An unexpected error occurred during setup")
         if ctx.obj.get('verbose', False):
             raise
-        sys.exit(1)
+        raise SystemExit(1)
 
 
 @cli.command("config-status")
@@ -700,7 +708,7 @@ def config_status(ctx: click.Context):
         error_echo("An unexpected error occurred while checking configuration")
         if ctx.obj.get('verbose', False):
             raise
-        sys.exit(1)
+        raise SystemExit(1)
 
 
 # Helper functions for CLI utilities

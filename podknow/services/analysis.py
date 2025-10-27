@@ -66,10 +66,9 @@ class ClaudeAPIClient:
                 rich_available = True
             except ImportError:
                 rich_available = False
-            
+
             import threading
-            import time
-            
+
             if rich_available:
                 with Progress(
                     SpinnerColumn(),
@@ -281,9 +280,7 @@ If no sponsor content is found, return an empty array: []"""
                 rich_available = True
             except ImportError:
                 rich_available = False
-            
-            import time
-            
+
             # Estimate transcription length for progress context
             word_count = len(transcription.split())
             char_count = len(transcription)

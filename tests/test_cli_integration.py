@@ -471,49 +471,38 @@ class TestCLISetupCommands:
     """Test CLI setup and configuration commands."""
     
     @pytest.mark.integration
-    def test_setup_command_success(self, cli_runner):
+    def test_setup_command_success(self, cli_runner, clean_config):
         """Test successful setup command execution."""
-        with patch('podknow.config.manager.ConfigManager') as mock_manager_class:
-            mock_manager = Mock()
-            mock_manager.config_exists.return_value = False
-            mock_manager.generate_config_for_first_time_setup.return_value = "/tmp/config.md"
-            mock_manager_class.return_value = mock_manager
-            
-            result = cli_runner.invoke(cli, ['setup'])
-            
-            assert result.exit_code == 0
-            assert "Configuration file created successfully" in result.output
-            assert "/tmp/config.md" in result.output
-            assert "Claude API key" in result.output
+        result = cli_runner.invoke(cli, ['setup'])
+
+        assert result.exit_code == 0
+        assert "Configuration file created successfully" in result.output
+        assert "Claude API key" in result.output
     
     @pytest.mark.integration
-    def test_setup_command_existing_config(self, cli_runner):
+    def test_setup_command_existing_config(self, cli_runner, clean_config):
         """Test setup command with existing configuration."""
-        with patch('podknow.config.manager.ConfigManager') as mock_manager_class:
-            mock_manager = Mock()
-            mock_manager.config_exists.return_value = True
-            mock_manager.config_path = Path("/tmp/config.md")
-            mock_manager_class.return_value = mock_manager
-            
-            result = cli_runner.invoke(cli, ['setup'])
-            
-            assert result.exit_code == 0
-            assert "Configuration file already exists" in result.output
-            assert "--force" in result.output
+        # First create a config
+        cli_runner.invoke(cli, ['setup'])
+
+        # Try to create it again without force
+        result = cli_runner.invoke(cli, ['setup'])
+
+        assert result.exit_code == 0
+        assert "Configuration file already exists" in result.output
+        assert "--force" in result.output
     
     @pytest.mark.integration
-    def test_setup_command_force_overwrite(self, cli_runner):
+    def test_setup_command_force_overwrite(self, cli_runner, clean_config):
         """Test setup command with force overwrite."""
-        with patch('podknow.config.manager.ConfigManager') as mock_manager_class:
-            mock_manager = Mock()
-            mock_manager.config_exists.return_value = True
-            mock_manager.generate_config_for_first_time_setup.return_value = "/tmp/config.md"
-            mock_manager_class.return_value = mock_manager
-            
-            result = cli_runner.invoke(cli, ['setup', '--force'])
-            
-            assert result.exit_code == 0
-            assert "Configuration file created successfully" in result.output
+        # First create a config
+        cli_runner.invoke(cli, ['setup'])
+
+        # Overwrite with --force
+        result = cli_runner.invoke(cli, ['setup', '--force'])
+
+        assert result.exit_code == 0
+        assert "Configuration file created successfully" in result.output
     
     @pytest.mark.integration
     def test_config_status_command_valid_config(self, cli_runner):
