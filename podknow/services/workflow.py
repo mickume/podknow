@@ -127,7 +127,7 @@ class WorkflowState:
     
     def set_step(self, step_name: str):
         """Set current workflow step."""
-        if self.current_step != "initialization":
+        if self.current_step:
             self.completed_steps.append(self.current_step)
         self.current_step = step_name
     
@@ -472,11 +472,11 @@ class WorkflowOrchestrator:
             if state.is_recoverable():
                 self.logger.info("Workflow state is recoverable - intermediate results preserved")
             
-            # Cleanup on failure
+            raise
+        finally:
+            # Always cleanup audio file, even on exceptions
             if state.audio_file_path:
                 self._cleanup_audio_file(state.audio_file_path)
-            
-            raise
     
     def execute_analysis_workflow(self, 
                                 transcription_file: str,

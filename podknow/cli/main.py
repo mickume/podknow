@@ -8,7 +8,7 @@ import os
 from typing import Optional
 from datetime import datetime
 
-from ..exceptions import PodKnowError
+from ..exceptions import PodKnowError, NetworkError
 from ..services.workflow import WorkflowOrchestrator
 
 
@@ -159,6 +159,9 @@ def search(ctx: click.Context, keywords: str, platform: str, limit: int):
             click.echo("To list episodes from a podcast, use:")
             click.echo("  podknow list <RSS_FEED_URL>")
         
+    except KeyboardInterrupt:
+        # Let KeyboardInterrupt bubble up to global handler
+        raise
     except NetworkError as e:
         error_echo(f"Search failed: {e}")
         click.echo("\nTroubleshooting:")
@@ -166,13 +169,13 @@ def search(ctx: click.Context, keywords: str, platform: str, limit: int):
         click.echo("- Try again in a few moments")
         if 'spotify' in str(e).lower():
             click.echo("- For Spotify: ensure SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET are set")
-        sys.exit(1)
+        raise click.ClickException(str(e))
     except Exception as e:
         verbose_echo(ctx, f"Unexpected error during search: {e}")
         error_echo("An unexpected error occurred during search")
         if ctx.obj.get('verbose', False):
             raise
-        sys.exit(1)
+        raise click.ClickException("An unexpected error occurred during search")
 
 
 @cli.command("list")
@@ -267,19 +270,19 @@ def list_episodes(ctx: click.Context, rss_url: str, count: int, show_description
         if episodes:
             click.echo(f"  podknow transcribe {episodes[0].id} --rss-url {rss_url}")
         
-    except EpisodeManagementError as e:
+    except NetworkError as e:
         error_echo(f"Episode listing failed: {e}")
         click.echo("\nTroubleshooting:")
         click.echo("- Verify the RSS URL is correct and accessible")
         click.echo("- Check your internet connection")
         click.echo("- Ensure the feed contains valid episode data")
-        sys.exit(1)
+        raise click.ClickException(str(e))
     except Exception as e:
         verbose_echo(ctx, f"Unexpected error during episode listing: {e}")
         error_echo("An unexpected error occurred while listing episodes")
         if ctx.obj.get('verbose', False):
             raise
-        sys.exit(1)
+        raise click.ClickException("An unexpected error occurred while listing episodes")
 
 
 @cli.command()
@@ -364,12 +367,19 @@ def transcribe(
     except KeyboardInterrupt:
         progress_echo("Transcription cancelled by user")
         sys.exit(130)
+    except NetworkError as e:
+        error_echo(f"Transcription failed: {e}")
+        click.echo("\nTroubleshooting:")
+        click.echo("- Verify the RSS URL and episode ID are correct")
+        click.echo("- Check your internet connection")
+        click.echo("- Ensure the episode audio is accessible")
+        raise click.ClickException(str(e))
     except Exception as e:
         verbose_echo(ctx, f"Unexpected error during transcription: {e}")
         error_echo("An unexpected error occurred during transcription")
         if ctx.obj.get('verbose', False):
             raise
-        sys.exit(1)
+        raise click.ClickException("An unexpected error occurred during transcription")
 
 
 @cli.command()
@@ -421,129 +431,21 @@ def analyze(
         # Success message
         click.echo(f"\n✅ Analysis completed successfully!")
         click.echo(f"📄 Output file: {output_path}")
+        return
         
-        # Step 1: Read and parse the transcription file
-        progress_echo("Reading transcription file...")
-        try:
-            with open(transcription_file, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            # Parse frontmatter and content
-            if content.startswith('---'):
-                parts = content.split('---', 2)
-                if len(parts) >= 3:
-                    frontmatter_text = parts[1]
-                    body_content = parts[2].strip()
-                    
-                    try:
-                        frontmatter = yaml.safe_load(frontmatter_text)
-                    except yaml.YAMLError as e:
-                        error_echo(f"Failed to parse YAML frontmatter: {e}")
-                        sys.exit(1)
-                else:
-                    error_echo("Invalid markdown format: frontmatter not properly closed")
-                    sys.exit(1)
-            else:
-                error_echo("File does not contain YAML frontmatter")
-                click.echo("Expected format: markdown file with YAML frontmatter containing episode metadata")
-                sys.exit(1)
-            
-            # Extract transcription text (remove headers and metadata sections)
-            transcription_text = re.sub(r'^#.*$', '', body_content, flags=re.MULTILINE)
-            transcription_text = re.sub(r'^\*.*\*$', '', transcription_text, flags=re.MULTILINE)
-            transcription_text = '\n'.join(line for line in transcription_text.split('\n') 
-                                         if line.strip() and not line.startswith('**'))
-            transcription_text = transcription_text.strip()
-            
-            if not transcription_text:
-                error_echo("No transcription text found in file")
-                sys.exit(1)
-            
-            verbose_echo(ctx, f"Extracted {len(transcription_text)} characters of transcription text")
-            
-        except Exception as e:
-            error_echo(f"Failed to read transcription file: {e}")
-            sys.exit(1)
-        
-        # Step 2: Perform analysis
-        progress_echo("Analyzing transcription with Claude AI...")
-        try:
-            analysis_service = AnalysisService(claude_api_key)
-            analysis_result = analysis_service.analyze_transcription(transcription_text)
-            
-            verbose_echo(ctx, f"Analysis completed: {len(analysis_result.topics)} topics, {len(analysis_result.keywords)} keywords")
-            
-            if analysis_result.sponsor_segments:
-                progress_echo(f"Detected {len(analysis_result.sponsor_segments)} potential sponsor segments")
-            
-        except AnalysisError as e:
-            error_echo(f"Analysis failed: {e}")
-            click.echo("\nTroubleshooting:")
-            click.echo("- Verify Claude API key is valid")
-            click.echo("- Check internet connection")
-            click.echo("- Ensure transcription text is readable")
-            sys.exit(1)
-        
-        # Step 3: Update frontmatter with analysis results
-        progress_echo("Updating file with analysis results...")
-        
-        # Add analysis results to frontmatter
-        frontmatter['keywords'] = analysis_result.keywords
-        frontmatter['sponsor_segments_detected'] = len(analysis_result.sponsor_segments)
-        frontmatter['analyzed_at'] = datetime.now().isoformat()
-        
-        # Step 4: Generate updated content
-        # Create new body with analysis sections
-        updated_body = f"""
-# Episode Summary
-
-{analysis_result.summary}
-
-## Topics Covered
-
-{chr(10).join(f"- {topic}" for topic in analysis_result.topics)}
-
-## Transcription
-
-{analysis_service._generate_transcription_section(transcription_text, analysis_result.sponsor_segments)}
-"""
-        
-        # Combine frontmatter and body
-        updated_content = f"""---
-{yaml.dump(frontmatter, default_flow_style=False, allow_unicode=True)}---
-{updated_body}
-"""
-        
-        # Step 5: Write output file
-        output_path = output_file or transcription_file
-        
-        try:
-            with open(output_path, 'w', encoding='utf-8') as f:
-                f.write(updated_content)
-            
-            verbose_echo(ctx, f"Analysis results saved to: {output_path}")
-            
-        except Exception as e:
-            error_echo(f"Failed to write output file: {e}")
-            sys.exit(1)
-        
-        # Success message
-        click.echo(f"\n✅ Analysis completed successfully!")
-        click.echo(f"📄 Output file: {output_path}")
-        click.echo(f"📊 Analysis: {len(analysis_result.topics)} topics, {len(analysis_result.keywords)} keywords")
-        
-        if analysis_result.sponsor_segments:
-            click.echo(f"📢 Sponsor segments: {len(analysis_result.sponsor_segments)} detected")
-        
-    except KeyboardInterrupt:
-        progress_echo("Analysis cancelled by user")
-        sys.exit(130)
+    except AnalysisError as e:
+        error_echo(f"Analysis failed: {e}")
+        click.echo("\nTroubleshooting:")
+        click.echo("- Verify Claude API key is valid")
+        click.echo("- Check internet connection")
+        click.echo("- Ensure transcription text is readable")
+        raise click.ClickException(str(e))
     except Exception as e:
         verbose_echo(ctx, f"Unexpected error during analysis: {e}")
         error_echo("An unexpected error occurred during analysis")
         if ctx.obj.get('verbose', False):
             raise
-        sys.exit(1)
+        raise click.ClickException("An unexpected error occurred during analysis")
 
 
 @cli.command()
