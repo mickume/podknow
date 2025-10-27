@@ -237,7 +237,7 @@ chunk_size: 8192
 
 ```yaml
 # Claude API settings
-claude_model: "claude-sonnet-4-5-20250929"
+claude_model: "claude-sonnet-4-20250514"
 max_tokens: 4000
 temperature: 0.1
 

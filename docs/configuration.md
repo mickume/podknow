@@ -60,9 +60,9 @@ output_directory: "~/Documents/PodKnow"
 
 2. **Model Selection**
    ```yaml
-   claude_model: "claude-sonnet-4-5-20250929"  # Recommended (latest)
-   # claude_model: "claude-haiku-4-5-20251001"  # Faster, less detailed
-   # claude_model: "claude-opus-4-1-20250805"   # Most capable, slower, most expensive
+   claude_model: "claude-sonnet-4-20250514"  # Recommended (latest)
+   # claude_model: "claude-haiku-4-5-20251001"    # Faster, less detailed
+   # claude_model: "claude-opus-4-1-20250805"     # Most capable, slower, most expensive
    ```
 
 ### Spotify (Optional)

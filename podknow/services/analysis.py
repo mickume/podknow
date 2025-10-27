@@ -16,17 +16,18 @@ from ..models.output import OutputDocument
 from ..models.episode import EpisodeMetadata
 from ..exceptions import AnalysisError, ClaudeAPIError, ConfigurationError
 from ..config.manager import ConfigManager
+from ..constants import DEFAULT_CLAUDE_MODEL
 
 
 class ClaudeAPIClient:
     """Claude API client with authentication, rate limiting, and error handling."""
     
-    def __init__(self, api_key: str, model: str = "claude-sonnet-4-5-20250929", max_retries: int = 3, retry_delay: float = 1.0):
+    def __init__(self, api_key: str, model: str = DEFAULT_CLAUDE_MODEL, max_retries: int = 3, retry_delay: float = 1.0):
         """Initialize Claude API client.
         
         Args:
             api_key: Claude API key
-            model: Claude model to use (default: claude-sonnet-4-5-20250929)
+            model: Claude model to use (default: DEFAULT_CLAUDE_MODEL)
             max_retries: Maximum number of retry attempts
             retry_delay: Base delay between retries in seconds
         """
@@ -99,12 +100,12 @@ class ClaudeAPIClient:
 class AnalysisService:
     """Service for AI-powered content analysis using Claude API."""
     
-    def __init__(self, api_key: str, model: str = "claude-sonnet-4-5-20250929", prompts: Optional[Dict[str, str]] = None):
+    def __init__(self, api_key: str, model: str = DEFAULT_CLAUDE_MODEL, prompts: Optional[Dict[str, str]] = None):
         """Initialize analysis service.
         
         Args:
             api_key: Claude API key
-            model: Claude model to use (default: claude-sonnet-4-5-20250929)
+            model: Claude model to use (default: DEFAULT_CLAUDE_MODEL)
             prompts: Optional custom prompts for different analysis types
         """
         self.claude_client = ClaudeAPIClient(api_key, model=model)

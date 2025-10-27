@@ -7,6 +7,8 @@ from typing import Dict, Any, Optional
 from pathlib import Path
 import os
 
+from ..constants import DEFAULT_CLAUDE_MODEL
+
 
 @dataclass
 class Config:
@@ -26,7 +28,7 @@ class Config:
     temp_directory: str = ""
     
     # Analysis settings
-    claude_model: str = "claude-sonnet-4-5-20250929"
+    claude_model: str = DEFAULT_CLAUDE_MODEL
     max_tokens: int = 4000
     temperature: float = 0.1
     max_retries: int = 3

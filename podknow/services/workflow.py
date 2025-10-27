@@ -23,6 +23,7 @@ from ..services.episode import EpisodeListingService
 from ..services.transcription import TranscriptionService
 from ..services.analysis import AnalysisService
 from ..config.manager import ConfigManager
+from ..constants import DEFAULT_CLAUDE_MODEL
 from ..exceptions import (
     PodKnowError,
     NetworkError,
@@ -203,7 +204,7 @@ class WorkflowOrchestrator:
             self._transcription_service = TranscriptionService()
         return self._transcription_service
     
-    def get_analysis_service(self, api_key: str, model: str = "claude-sonnet-4-5-20250929") -> AnalysisService:
+    def get_analysis_service(self, api_key: str, model: str = DEFAULT_CLAUDE_MODEL) -> AnalysisService:
         """Get analysis service with API key, model, and configuration-based prompts."""
         if self._analysis_service is None:
             # Load prompts from configuration
