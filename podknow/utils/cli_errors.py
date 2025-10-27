@@ -64,9 +64,9 @@ def handle_cli_errors(func: Callable) -> Callable:
             return func(*args, **kwargs)
 
         except KeyboardInterrupt:
-            # Let KeyboardInterrupt bubble up to global handler
-            # (which is set up in cli() function)
-            raise
+            # Handle KeyboardInterrupt with proper exit code
+            click.echo("\nOperation cancelled by user.", err=True)
+            sys.exit(130)
 
         except click.ClickException:
             # Click exceptions are already formatted, let them through
