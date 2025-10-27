@@ -166,20 +166,57 @@ class TranscriptionService:
             sample_path = self._create_audio_sample(audio_path, skip_minutes, sample_duration)
             
             try:
-                # Suppress MLX-Whisper model download progress
-                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
-                    # Use MLX-Whisper to detect language on the sample
-                    result = mlx_whisper.transcribe(
-                        sample_path,
-                        language=None,  # Auto-detect
-                        task="transcribe",
-                        word_timestamps=False,
-                        condition_on_previous_text=False,
-                        initial_prompt=None,
-                        fp16=True  # Use half precision for speed
-                    )
+                # Show progress for language detection
+                from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+                import threading
+                import time
+                
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[bold yellow]Detecting language"),
+                    TextColumn("•"),
+                    TimeElapsedColumn(),
+                    refresh_per_second=4,
+                ) as progress:
+                    
+                    task = progress.add_task("language_detection", total=None)
+                    
+                    # Function to run language detection in background
+                    def run_language_detection():
+                        nonlocal result
+                        # Suppress MLX-Whisper model download progress
+                        with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                            # Use MLX-Whisper to detect language on the sample
+                            result = mlx_whisper.transcribe(
+                                sample_path,
+                                language=None,  # Auto-detect
+                                task="transcribe",
+                                word_timestamps=False,
+                                condition_on_previous_text=False,
+                                initial_prompt=None,
+                                fp16=True  # Use half precision for speed
+                            )
+                    
+                    # Start language detection in background thread
+                    result = None
+                    detection_thread = threading.Thread(target=run_language_detection)
+                    detection_thread.start()
+                    
+                    # Update progress while detection is running
+                    while detection_thread.is_alive():
+                        progress.update(task, advance=0.1)
+                        time.sleep(0.1)
+                    
+                    # Wait for detection to complete
+                    detection_thread.join()
+                    
+                    # Mark as completed
+                    progress.update(task, completed=True)
                 
                 detected_language = result.get("language", "unknown")
+                
+                # Show detection result
+                print(f"✅ Language detected: {detected_language.upper()}")
                 
                 # Validate English requirement
                 if detected_language != "en":
@@ -224,8 +261,21 @@ class TranscriptionService:
             import librosa
             import soundfile as sf
             
-            # Load audio file
-            y, sr = librosa.load(audio_path, sr=None)
+            # Show progress for audio loading (can be slow for large files)
+            from rich.progress import Progress, SpinnerColumn, TextColumn
+            
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[bold cyan]Preparing audio sample"),
+                refresh_per_second=4,
+            ) as progress:
+                
+                task = progress.add_task("audio_sample", total=None)
+                
+                # Load audio file
+                y, sr = librosa.load(audio_path, sr=None)
+                
+                progress.update(task, completed=True)
             
             # Calculate sample positions
             skip_samples = int(skip_minutes * 60 * sr)
@@ -291,19 +341,78 @@ class TranscriptionService:
             
             print(f"Starting transcription of {audio_path}...")
             
-            # Suppress MLX-Whisper model download progress
-            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
-                # Perform transcription with word timestamps for paragraph detection
-                result = mlx_whisper.transcribe(
-                    audio_path,
-                    language="en",  # We've already validated it's English
-                    task="transcribe",
-                    word_timestamps=True,  # Enable for paragraph detection
-                    condition_on_previous_text=True,
-                    fp16=True,  # Use half precision for Apple Silicon optimization
-                    prepend_punctuations="\"'([{-",
-                    append_punctuations="\"'.,:!?)]}-"
-                )
+            # Get audio duration for progress estimation
+            audio_duration = self._get_audio_duration(audio_path)
+            
+            # Create progress bar for transcription
+            from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn, BarColumn
+            import threading
+            import time
+            
+            # Estimate transcription time (typically 10-20% of audio duration for MLX-Whisper)
+            estimated_time = max(audio_duration * 0.15, 10.0) if audio_duration > 0 else None
+            
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[bold blue]Transcribing audio"),
+                BarColumn(bar_width=None) if estimated_time else TextColumn(""),
+                TextColumn("[progress.percentage]{task.percentage:>3.0f}%") if estimated_time else TextColumn(""),
+                TextColumn("•"),
+                TimeElapsedColumn(),
+                refresh_per_second=4,
+            ) as progress:
+                
+                # Add transcription task with estimated total if available
+                if estimated_time:
+                    task = progress.add_task("transcription", total=100)
+                    duration_text = f" ({audio_duration:.1f}s audio)" if audio_duration > 0 else ""
+                    progress.update(task, description=f"[bold blue]Transcribing audio{duration_text}")
+                else:
+                    task = progress.add_task("transcription", total=None)
+                
+                # Function to run transcription in background
+                def run_transcription():
+                    nonlocal result
+                    # Suppress MLX-Whisper model download progress
+                    with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                        # Perform transcription with word timestamps for paragraph detection
+                        result = mlx_whisper.transcribe(
+                            audio_path,
+                            language="en",  # We've already validated it's English
+                            task="transcribe",
+                            word_timestamps=True,  # Enable for paragraph detection
+                            condition_on_previous_text=True,
+                            fp16=True,  # Use half precision for Apple Silicon optimization
+                            prepend_punctuations="\"'([{-",
+                            append_punctuations="\"'.,:!?)]}-"
+                        )
+                
+                # Start transcription in background thread
+                result = None
+                transcription_thread = threading.Thread(target=run_transcription)
+                transcription_thread.start()
+                start_time = time.time()
+                
+                # Update progress while transcription is running
+                while transcription_thread.is_alive():
+                    if estimated_time:
+                        # Calculate progress based on elapsed time vs estimated time
+                        elapsed = time.time() - start_time
+                        progress_percent = min((elapsed / estimated_time) * 100, 95)  # Cap at 95% until done
+                        progress.update(task, completed=progress_percent)
+                    else:
+                        # Just show activity
+                        progress.update(task, advance=0.1)
+                    time.sleep(0.25)
+                
+                # Wait for transcription to complete
+                transcription_thread.join()
+                
+                # Mark as completed
+                if estimated_time:
+                    progress.update(task, completed=100)
+                else:
+                    progress.update(task, completed=True)
             
             # Extract basic transcription info
             full_text = result.get("text", "").strip()
@@ -342,7 +451,15 @@ class TranscriptionService:
             # Calculate overall confidence (average of segment confidences if available)
             confidence = self._calculate_confidence(raw_segments)
             
-            print(f"Transcription completed. Language: {language}, Confidence: {confidence:.2f}")
+            # Calculate actual transcription time
+            actual_time = time.time() - start_time
+            speed_ratio = audio_duration / actual_time if audio_duration > 0 and actual_time > 0 else 0
+            
+            print(f"✅ Transcription completed!")
+            print(f"   Language: {language}")
+            print(f"   Confidence: {confidence:.2f}")
+            if audio_duration > 0 and actual_time > 0:
+                print(f"   Speed: {speed_ratio:.1f}x realtime ({actual_time:.1f}s for {audio_duration:.1f}s audio)")
             
             return TranscriptionResult(
                 text=full_text,
@@ -403,6 +520,35 @@ class TranscriptionService:
             return True
         
         return False
+    
+    def _get_audio_duration(self, audio_path: str) -> float:
+        """
+        Get the duration of an audio file in seconds.
+        
+        Args:
+            audio_path: Path to the audio file
+            
+        Returns:
+            float: Duration in seconds, or 0.0 if unable to determine
+        """
+        try:
+            import librosa
+            
+            # Load audio file to get duration
+            duration = librosa.get_duration(path=audio_path)
+            return duration
+            
+        except ImportError:
+            # Fallback: estimate based on file size (very rough approximation)
+            try:
+                file_size = os.path.getsize(audio_path)
+                # Rough estimate: 1MB ≈ 1 minute for typical podcast audio
+                estimated_duration = file_size / (1024 * 1024) * 60
+                return estimated_duration
+            except:
+                return 0.0
+        except Exception:
+            return 0.0
     
     def _calculate_confidence(self, segments: list) -> float:
         """

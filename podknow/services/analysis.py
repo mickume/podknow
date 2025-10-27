@@ -39,13 +39,14 @@ class ClaudeAPIClient:
         self.max_retries = max_retries
         self.retry_delay = retry_delay
     
-    def send_message(self, prompt: str, system_prompt: str = None, max_tokens: int = 4000) -> str:
+    def send_message(self, prompt: str, system_prompt: str = None, max_tokens: int = 4000, show_progress: bool = False) -> str:
         """Send a message to Claude API with retry logic.
         
         Args:
             prompt: User prompt to send
             system_prompt: Optional system prompt
             max_tokens: Maximum tokens in response
+            show_progress: Whether to show progress indicator for this call
             
         Returns:
             Claude's response text
@@ -55,6 +56,107 @@ class ClaudeAPIClient:
         """
         messages = [{"role": "user", "content": prompt}]
         
+        # Estimate response time based on prompt length (rough approximation)
+        prompt_length = len(prompt) + (len(system_prompt) if system_prompt else 0)
+        estimated_time = min(max(prompt_length / 1000, 2.0), 30.0)  # 2-30 seconds
+        
+        if show_progress:
+            try:
+                from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+                rich_available = True
+            except ImportError:
+                rich_available = False
+            
+            import threading
+            import time
+            
+            if rich_available:
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[bold magenta]Calling Claude API"),
+                    TextColumn("•"),
+                    TimeElapsedColumn(),
+                    refresh_per_second=4,
+                ) as progress:
+                    
+                    task = progress.add_task("claude_api", total=None)
+                    
+                    # Initialize variables for thread communication
+                    response_result = None
+                    api_error = None
+                    
+                    def make_api_call():
+                        nonlocal response_result, api_error
+                        for attempt in range(self.max_retries + 1):
+                            try:
+                                kwargs = {
+                                    "model": self.model,
+                                    "max_tokens": max_tokens,
+                                    "messages": messages
+                                }
+                                
+                                if system_prompt:
+                                    kwargs["system"] = system_prompt
+                                
+                                response = self.client.messages.create(**kwargs)
+                                
+                                if response.content and len(response.content) > 0:
+                                    response_result = response.content[0].text
+                                    return
+                                else:
+                                    raise ClaudeAPIError("Empty response from Claude API")
+                                    
+                            except anthropic.RateLimitError as e:
+                                if attempt < self.max_retries:
+                                    delay = self.retry_delay * (2 ** attempt)
+                                    time.sleep(delay)
+                                    continue
+                                api_error = ClaudeAPIError(f"Rate limit exceeded after {self.max_retries} retries", details=str(e))
+                                return
+                                
+                            except anthropic.APIError as e:
+                                if attempt < self.max_retries and e.status_code >= 500:
+                                    delay = self.retry_delay * (2 ** attempt)
+                                    time.sleep(delay)
+                                    continue
+                                api_error = ClaudeAPIError(f"Claude API error: {e.message}", status_code=e.status_code, details=str(e))
+                                return
+                                
+                            except Exception as e:
+                                if attempt < self.max_retries:
+                                    delay = self.retry_delay * (2 ** attempt)
+                                    time.sleep(delay)
+                                    continue
+                                api_error = ClaudeAPIError(f"Unexpected error calling Claude API: {str(e)}")
+                                return
+                        
+                        api_error = ClaudeAPIError(f"Failed to get response after {self.max_retries} retries")
+                    
+                    # Start API call in background thread
+                    api_thread = threading.Thread(target=make_api_call)
+                    api_thread.start()
+                    
+                    # Update progress while API call is running
+                    while api_thread.is_alive():
+                        progress.update(task, advance=0.1)
+                        time.sleep(0.25)
+                    
+                    # Wait for API call to complete
+                    api_thread.join()
+                    
+                    # Mark as completed
+                    progress.update(task, completed=True)
+                    
+                    if api_error:
+                        raise api_error
+                    
+                    return response_result
+            else:
+                # Fallback when rich is not available but progress is requested
+                print("Calling Claude API...")
+                # Fall through to synchronous implementation
+        
+        # Synchronous implementation (used when progress=False or rich not available)
         for attempt in range(self.max_retries + 1):
             try:
                 kwargs = {
@@ -173,11 +275,85 @@ If no sponsor content is found, return an empty array: []"""
             raise AnalysisError("Transcription text is required for analysis")
         
         try:
-            # Generate all analysis components
-            summary = self.generate_summary(transcription)
-            topics = self.extract_topics(transcription)
-            keywords = self.identify_keywords(transcription)
-            sponsor_segments = self.detect_sponsor_content(transcription)
+            # Show progress for analysis steps
+            try:
+                from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+                rich_available = True
+            except ImportError:
+                rich_available = False
+            
+            import time
+            
+            # Estimate transcription length for progress context
+            word_count = len(transcription.split())
+            char_count = len(transcription)
+            
+            if rich_available:
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[bold green]{task.description}"),
+                    BarColumn(bar_width=None),
+                    TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                    TextColumn("•"),
+                    TimeElapsedColumn(),
+                    refresh_per_second=4,
+                ) as progress:
+                    
+                    # Add overall analysis task
+                    analysis_task = progress.add_task(
+                        f"Analyzing content ({word_count:,} words)", 
+                        total=100
+                    )
+                    
+                    start_time = time.time()
+                    
+                    # Step 1: Generate summary (25% of progress)
+                    progress.update(analysis_task, description="[bold green]Generating summary")
+                    summary = self.generate_summary(transcription, show_progress=False)
+                    progress.update(analysis_task, completed=25)
+                    
+                    # Step 2: Extract topics (50% of progress)
+                    progress.update(analysis_task, description="[bold green]Extracting topics")
+                    topics = self.extract_topics(transcription, show_progress=False)
+                    progress.update(analysis_task, completed=50)
+                    
+                    # Step 3: Identify keywords (75% of progress)
+                    progress.update(analysis_task, description="[bold green]Identifying keywords")
+                    keywords = self.identify_keywords(transcription, show_progress=False)
+                    progress.update(analysis_task, completed=75)
+                    
+                    # Step 4: Detect sponsor content (100% of progress)
+                    progress.update(analysis_task, description="[bold green]Detecting sponsor content")
+                    sponsor_segments = self.detect_sponsor_content(transcription, show_progress=False)
+                    progress.update(analysis_task, completed=100)
+                    
+                    # Calculate analysis time
+                    analysis_time = time.time() - start_time
+            else:
+                # Fallback when rich is not available
+                start_time = time.time()
+                
+                print("Generating summary...")
+                summary = self.generate_summary(transcription, show_progress=False)
+                
+                print("Extracting topics...")
+                topics = self.extract_topics(transcription, show_progress=False)
+                
+                print("Identifying keywords...")
+                keywords = self.identify_keywords(transcription, show_progress=False)
+                
+                print("Detecting sponsor content...")
+                sponsor_segments = self.detect_sponsor_content(transcription, show_progress=False)
+                
+                analysis_time = time.time() - start_time
+            
+            # Show completion summary
+            print(f"✅ Analysis completed!")
+            print(f"   Summary: {len(summary.split())} words")
+            print(f"   Topics: {len(topics)} identified")
+            print(f"   Keywords: {len(keywords)} extracted")
+            print(f"   Sponsor segments: {len(sponsor_segments)} detected")
+            print(f"   Processing time: {analysis_time:.1f}s")
             
             return AnalysisResult(
                 summary=summary,
@@ -191,14 +367,14 @@ If no sponsor content is found, return an empty array: []"""
                 raise
             raise AnalysisError(f"Failed to analyze transcription: {str(e)}")
     
-    def generate_summary(self, transcription: str) -> str:
+    def generate_summary(self, transcription: str, show_progress: bool = True) -> str:
         """Generate content summary using Claude AI."""
         if not transcription or not transcription.strip():
             raise AnalysisError("Transcription text is required for summary generation")
         
         try:
             prompt = f"{self.prompts['summary']}\n\nTranscription:\n{transcription}"
-            response = self.claude_client.send_message(prompt)
+            response = self.claude_client.send_message(prompt, show_progress=show_progress)
             
             if not response or not response.strip():
                 raise AnalysisError("Claude API returned empty summary")
@@ -210,14 +386,14 @@ If no sponsor content is found, return an empty array: []"""
         except Exception as e:
             raise AnalysisError(f"Failed to generate summary: {str(e)}")
     
-    def extract_topics(self, transcription: str) -> List[str]:
+    def extract_topics(self, transcription: str, show_progress: bool = True) -> List[str]:
         """Extract main topics from transcription."""
         if not transcription or not transcription.strip():
             raise AnalysisError("Transcription text is required for topic extraction")
         
         try:
             prompt = f"{self.prompts['topics']}\n\nTranscription:\n{transcription}"
-            response = self.claude_client.send_message(prompt)
+            response = self.claude_client.send_message(prompt, show_progress=show_progress)
             
             if not response or not response.strip():
                 raise AnalysisError("Claude API returned empty topics response")
@@ -235,14 +411,14 @@ If no sponsor content is found, return an empty array: []"""
         except Exception as e:
             raise AnalysisError(f"Failed to extract topics: {str(e)}")
     
-    def identify_keywords(self, transcription: str) -> List[str]:
+    def identify_keywords(self, transcription: str, show_progress: bool = True) -> List[str]:
         """Identify relevant keywords from transcription."""
         if not transcription or not transcription.strip():
             raise AnalysisError("Transcription text is required for keyword identification")
         
         try:
             prompt = f"{self.prompts['keywords']}\n\nTranscription:\n{transcription}"
-            response = self.claude_client.send_message(prompt)
+            response = self.claude_client.send_message(prompt, show_progress=show_progress)
             
             if not response or not response.strip():
                 raise AnalysisError("Claude API returned empty keywords response")
@@ -278,14 +454,14 @@ If no sponsor content is found, return an empty array: []"""
         except Exception as e:
             raise AnalysisError(f"Failed to identify keywords: {str(e)}")
     
-    def detect_sponsor_content(self, transcription: str) -> List[SponsorSegment]:
+    def detect_sponsor_content(self, transcription: str, show_progress: bool = True) -> List[SponsorSegment]:
         """Detect sponsor content segments in transcription."""
         if not transcription or not transcription.strip():
             raise AnalysisError("Transcription text is required for sponsor detection")
         
         try:
             prompt = f"{self.prompts['sponsors']}\n\nTranscription:\n{transcription}"
-            response = self.claude_client.send_message(prompt)
+            response = self.claude_client.send_message(prompt, show_progress=show_progress)
             
             if not response or not response.strip():
                 return []  # No sponsor content found
@@ -333,19 +509,46 @@ If no sponsor content is found, return an empty array: []"""
             Formatted markdown string with frontmatter and content
         """
         try:
-            # Generate frontmatter
-            frontmatter = self._generate_frontmatter(output_doc)
+            # Show progress for markdown generation
+            from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
+            import time
             
-            # Generate content sections
-            summary_section = self._generate_summary_section(output_doc.analysis)
-            topics_section = self._generate_topics_section(output_doc.analysis)
-            transcription_section = self._generate_transcription_section(
-                output_doc.transcription, 
-                output_doc.analysis.sponsor_segments
-            )
-            
-            # Combine all sections
-            markdown_content = f"""{frontmatter}
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[bold blue]Generating markdown output"),
+                BarColumn(bar_width=None),
+                TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                refresh_per_second=4,
+            ) as progress:
+                
+                task = progress.add_task("markdown", total=100)
+                
+                # Generate frontmatter (20%)
+                progress.update(task, description="[bold blue]Creating frontmatter")
+                frontmatter = self._generate_frontmatter(output_doc)
+                progress.update(task, completed=20)
+                
+                # Generate content sections (40%)
+                progress.update(task, description="[bold blue]Formatting summary")
+                summary_section = self._generate_summary_section(output_doc.analysis)
+                progress.update(task, completed=40)
+                
+                # Generate topics section (60%)
+                progress.update(task, description="[bold blue]Formatting topics")
+                topics_section = self._generate_topics_section(output_doc.analysis)
+                progress.update(task, completed=60)
+                
+                # Generate transcription section (80%)
+                progress.update(task, description="[bold blue]Processing transcription")
+                transcription_section = self._generate_transcription_section(
+                    output_doc.transcription, 
+                    output_doc.analysis.sponsor_segments
+                )
+                progress.update(task, completed=80)
+                
+                # Combine all sections (100%)
+                progress.update(task, description="[bold blue]Finalizing document")
+                markdown_content = f"""{frontmatter}
 
 # Episode Summary
 
@@ -359,6 +562,13 @@ If no sponsor content is found, return an empty array: []"""
 
 {transcription_section}
 """
+                progress.update(task, completed=100)
+            
+            # Show completion info
+            word_count = len(markdown_content.split())
+            line_count = len(markdown_content.split('\n'))
+            print(f"✅ Markdown document generated!")
+            print(f"   Document size: {word_count:,} words, {line_count:,} lines")
             
             return markdown_content
             
