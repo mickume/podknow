@@ -120,7 +120,7 @@ Include both explicit mentions and implicit themes that would help categorize th
 Return only the keywords separated by commas, without explanations.
 Prioritize terms that would be useful for search and categorization.""",
             
-            "sponsors": """Identify any sponsored content or advertisements in this transcription. 
+            "sponsor_detection": """Identify any sponsored content or advertisements in this transcription. 
 Look for promotional language, product endorsements, discount codes, or clear advertising segments.
 Pay attention to phrases like "this episode is sponsored by", "thanks to our sponsor", 
 discount codes, special offers, or obvious product promotions.

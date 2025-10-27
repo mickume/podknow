@@ -224,7 +224,7 @@ class AnalysisService:
                     'summary': 'summary',
                     'topics': 'topics', 
                     'keywords': 'keywords',
-                    'sponsors': 'sponsor_detection'  # Config uses 'sponsor_detection', service uses 'sponsors'
+                    'sponsor_detection': 'sponsor_detection'  # Both config and service use 'sponsor_detection'
                 }
                 
                 prompts = {}
@@ -260,7 +260,7 @@ Return only the topic sentences, one per line, without numbering or bullets.""",
 Focus on specific terms, concepts, people, companies, or technologies mentioned. 
 Return ONLY the keywords separated by commas. Do not include any explanatory text, introductions, or additional commentary. Just the keywords.""",
             
-            "sponsors": """Identify any sponsored content or advertisements in this transcription. 
+            "sponsor_detection": """Identify any sponsored content or advertisements in this transcription. 
 Look for promotional language, product endorsements, discount codes, or clear advertising segments.
 For each sponsor segment found, provide the starting text (first few words) and ending text (last few words) of the segment.
 Also provide a confidence score from 0.0 to 1.0 indicating how certain you are this is sponsored content.
@@ -493,12 +493,12 @@ If no sponsor content is found, return an empty array: []"""
             return []
         
         try:
-            # Check if sponsors prompt is available
-            if 'sponsors' not in self.prompts:
+            # Check if sponsor_detection prompt is available
+            if 'sponsor_detection' not in self.prompts:
                 print("Warning: Sponsor detection prompt not available, skipping sponsor detection")
                 return []
             
-            prompt = f"{self.prompts['sponsors']}\n\nTranscription:\n{transcription}"
+            prompt = f"{self.prompts['sponsor_detection']}\n\nTranscription:\n{transcription}"
             response = self.claude_client.send_message(prompt, show_progress=show_progress)
             
             if not response or not response.strip():
