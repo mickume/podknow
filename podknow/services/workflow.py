@@ -202,10 +202,10 @@ class WorkflowOrchestrator:
             self._transcription_service = TranscriptionService()
         return self._transcription_service
     
-    def get_analysis_service(self, api_key: str) -> AnalysisService:
-        """Get analysis service with API key."""
+    def get_analysis_service(self, api_key: str, model: str = "claude-3-5-sonnet-20241022") -> AnalysisService:
+        """Get analysis service with API key and model."""
         if self._analysis_service is None:
-            self._analysis_service = AnalysisService(api_key)
+            self._analysis_service = AnalysisService(api_key, model=model)
         return self._analysis_service
     
     def execute_search_workflow(self, 
@@ -307,7 +307,9 @@ class WorkflowOrchestrator:
                                      rss_url: str,
                                      output_dir: Optional[str] = None,
                                      claude_api_key: Optional[str] = None,
-                                     skip_analysis: bool = False) -> str:
+                                     skip_analysis: bool = False,
+                                     skip_language_detection: bool = False,
+                                     language_detection_skip_minutes: float = 2.0) -> str:
         """Execute complete transcription workflow with error handling and recovery.
         
         Args:
@@ -316,6 +318,8 @@ class WorkflowOrchestrator:
             output_dir: Output directory for transcription
             claude_api_key: Claude API key for analysis
             skip_analysis: Skip AI analysis
+            skip_language_detection: Skip language detection (assume English)
+            language_detection_skip_minutes: Minutes to skip for language detection
             
         Returns:
             Path to generated output file
@@ -353,16 +357,23 @@ class WorkflowOrchestrator:
             except Exception as e:
                 raise AudioProcessingError(f"Audio download failed: {str(e)}")
             
-            # Step 3: Language detection
-            state.set_step("language_detection")
-            self.progress_callback("Detecting audio language...")
-            
-            try:
-                detected_language = self.transcription_service.detect_language(audio_file_path)
-                self.logger.debug(f"Detected language: {detected_language}")
-            except LanguageDetectionError as e:
-                self._cleanup_audio_file(audio_file_path)
-                raise e
+            # Step 3: Language detection (optional)
+            if not skip_language_detection:
+                state.set_step("language_detection")
+                self.progress_callback("Detecting audio language...")
+                
+                try:
+                    detected_language = self.transcription_service.detect_language(
+                        audio_file_path, 
+                        skip_minutes=language_detection_skip_minutes
+                    )
+                    self.logger.debug(f"Detected language: {detected_language}")
+                except LanguageDetectionError as e:
+                    self._cleanup_audio_file(audio_file_path)
+                    raise e
+            else:
+                self.logger.debug("Skipping language detection (assuming English)")
+                detected_language = "en"
             
             # Step 4: Transcription
             state.set_step("transcription")

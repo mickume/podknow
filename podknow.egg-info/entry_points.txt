@@ -1,0 +1,2 @@
+[console_scripts]
+podknow = podknow.cli.main:cli

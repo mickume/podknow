@@ -60,7 +60,7 @@ output_directory: "~/Documents/PodKnow"
 
 2. **Model Selection**
    ```yaml
-   claude_model: "claude-3-sonnet-20240229"  # Recommended
+   claude_model: "claude-3-5-sonnet-20241022"  # Recommended (latest)
    # claude_model: "claude-3-haiku-20240307"  # Faster, less detailed
    # claude_model: "claude-3-opus-20240229"   # Most capable, slower
    ```

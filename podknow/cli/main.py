@@ -307,6 +307,17 @@ def list_episodes(ctx: click.Context, rss_url: str, count: int, show_description
     envvar="CLAUDE_API_KEY",
     help="Claude API key for analysis (can also be set via CLAUDE_API_KEY env var)"
 )
+@click.option(
+    "--skip-language-detection",
+    is_flag=True,
+    help="Skip language detection and assume English content"
+)
+@click.option(
+    "--language-detection-skip-minutes",
+    type=float,
+    default=2.0,
+    help="Minutes to skip from beginning for language detection (default: 2.0)"
+)
 @click.pass_context
 def transcribe(
     ctx: click.Context, 
@@ -314,7 +325,9 @@ def transcribe(
     rss_url: str, 
     output_dir: Optional[str],
     skip_analysis: bool,
-    claude_api_key: Optional[str]
+    claude_api_key: Optional[str],
+    skip_language_detection: bool,
+    language_detection_skip_minutes: float
 ):
     """
     Download and transcribe a podcast episode with optional AI analysis.
@@ -327,6 +340,8 @@ def transcribe(
     
         podknow transcribe abc123def456 --rss-url https://feeds.example.com/podcast.xml
         podknow transcribe abc123def456 --rss-url https://feeds.example.com/podcast.xml --skip-analysis
+        podknow transcribe abc123def456 --rss-url https://feeds.example.com/podcast.xml --skip-language-detection
+        podknow transcribe abc123def456 --rss-url https://feeds.example.com/podcast.xml --language-detection-skip-minutes 3.0
         podknow transcribe abc123def456 --rss-url https://feeds.example.com/podcast.xml --output-dir ./transcripts
     """
     if not episode_id.strip():
@@ -357,7 +372,9 @@ def transcribe(
             rss_url=rss_url,
             output_dir=output_dir,
             claude_api_key=claude_api_key,
-            skip_analysis=skip_analysis
+            skip_analysis=skip_analysis,
+            skip_language_detection=skip_language_detection,
+            language_detection_skip_minutes=language_detection_skip_minutes
         )
         
         # Success message

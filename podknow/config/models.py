@@ -26,7 +26,7 @@ class Config:
     temp_directory: str = ""
     
     # Analysis settings
-    claude_model: str = "claude-3-sonnet-20240229"
+    claude_model: str = "claude-3-5-sonnet-20241022"
     max_tokens: int = 4000
     temperature: float = 0.1
     max_retries: int = 3

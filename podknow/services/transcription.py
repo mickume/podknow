@@ -123,12 +123,15 @@ class TranscriptionService:
         
         return False
     
-    def detect_language(self, audio_path: str) -> str:
+    def detect_language(self, audio_path: str, skip_minutes: float = 2.0, sample_duration: float = 30.0) -> str:
         """
         Detect the language of the audio file using MLX-Whisper.
+        Skips the first few minutes to avoid ads/intros in different languages.
         
         Args:
             audio_path: Path to the audio file
+            skip_minutes: Minutes to skip from the beginning (default: 2.0)
+            sample_duration: Duration of sample to analyze in seconds (default: 30.0)
             
         Returns:
             str: Detected language code (e.g., 'en', 'es', 'fr')
@@ -144,32 +147,37 @@ class TranscriptionService:
             if not os.path.exists(audio_path):
                 raise AudioProcessingError(f"Audio file not found: {audio_path}")
             
-            # Use MLX-Whisper to detect language
-            # We'll use a small sample for language detection to be efficient
-            result = mlx_whisper.transcribe(
-                audio_path,
-                language=None,  # Auto-detect
-                task="transcribe",
-                word_timestamps=False,
-                condition_on_previous_text=False,
-                initial_prompt=None,
-                decode_options={
-                    "language": None,  # Auto-detect
-                    "task": "transcribe",
-                    "fp16": True,  # Use half precision for speed
-                }
-            )
+            # Create a temporary sample file from the middle of the audio
+            sample_path = self._create_audio_sample(audio_path, skip_minutes, sample_duration)
             
-            detected_language = result.get("language", "unknown")
-            
-            # Validate English requirement
-            if detected_language != "en":
-                raise LanguageDetectionError(
-                    f"Non-English content detected. Language: {detected_language}. "
-                    "Only English podcasts are supported."
+            try:
+                # Use MLX-Whisper to detect language on the sample
+                result = mlx_whisper.transcribe(
+                    sample_path,
+                    language=None,  # Auto-detect
+                    task="transcribe",
+                    word_timestamps=False,
+                    condition_on_previous_text=False,
+                    initial_prompt=None,
+                    fp16=True  # Use half precision for speed
                 )
-            
-            return detected_language
+                
+                detected_language = result.get("language", "unknown")
+                
+                # Validate English requirement
+                if detected_language != "en":
+                    raise LanguageDetectionError(
+                        f"Non-English content detected. Language: {detected_language}. "
+                        "Only English podcasts are supported. "
+                        f"(Analyzed sample from {skip_minutes:.1f} minutes into the audio)"
+                    )
+                
+                return detected_language
+                
+            finally:
+                # Clean up sample file
+                if os.path.exists(sample_path):
+                    os.remove(sample_path)
             
         except ImportError:
             raise LanguageDetectionError(
@@ -179,6 +187,65 @@ class TranscriptionService:
             if isinstance(e, (LanguageDetectionError, AudioProcessingError)):
                 raise
             raise LanguageDetectionError(f"Language detection failed: {str(e)}")
+    
+    def _create_audio_sample(self, audio_path: str, skip_minutes: float, sample_duration: float) -> str:
+        """
+        Create a temporary audio sample from the middle of the file.
+        
+        Args:
+            audio_path: Path to the original audio file
+            skip_minutes: Minutes to skip from the beginning
+            sample_duration: Duration of sample in seconds
+            
+        Returns:
+            str: Path to the temporary sample file
+            
+        Raises:
+            AudioProcessingError: If audio sampling fails
+        """
+        try:
+            import librosa
+            import soundfile as sf
+            
+            # Load audio file
+            y, sr = librosa.load(audio_path, sr=None)
+            
+            # Calculate sample positions
+            skip_samples = int(skip_minutes * 60 * sr)
+            sample_length = int(sample_duration * sr)
+            
+            # Ensure we don't go beyond the audio length
+            if skip_samples >= len(y):
+                # If audio is shorter than skip time, use the last 30 seconds or entire audio
+                if len(y) > sample_length:
+                    start_sample = len(y) - sample_length
+                    end_sample = len(y)
+                else:
+                    start_sample = 0
+                    end_sample = len(y)
+            else:
+                start_sample = skip_samples
+                end_sample = min(skip_samples + sample_length, len(y))
+            
+            # Extract sample
+            sample = y[start_sample:end_sample]
+            
+            # Create temporary file for sample
+            sample_filename = f"language_sample_{hash(audio_path) % 10000}.wav"
+            sample_path = os.path.join(self.temp_dir, sample_filename)
+            
+            # Save sample
+            sf.write(sample_path, sample, sr)
+            
+            return sample_path
+            
+        except ImportError:
+            raise AudioProcessingError(
+                "librosa and soundfile are required for audio sampling. "
+                "Please install them: pip install librosa soundfile"
+            )
+        except Exception as e:
+            raise AudioProcessingError(f"Failed to create audio sample: {str(e)}")
     
     def transcribe_audio(self, audio_path: str) -> TranscriptionResult:
         """
@@ -210,14 +277,9 @@ class TranscriptionService:
                 task="transcribe",
                 word_timestamps=True,  # Enable for paragraph detection
                 condition_on_previous_text=True,
-                decode_options={
-                    "language": "en",
-                    "task": "transcribe",
-                    "fp16": True,  # Use half precision for Apple Silicon optimization
-                    "word_timestamps": True,
-                    "prepend_punctuations": "\"'([{-",
-                    "append_punctuations": "\"'.,:!?)]}-",
-                }
+                fp16=True,  # Use half precision for Apple Silicon optimization
+                prepend_punctuations="\"'([{-",
+                append_punctuations="\"'.,:!?)]}-"
             )
             
             # Extract basic transcription info
@@ -229,6 +291,15 @@ class TranscriptionService:
             raw_segments = result.get("segments", [])
             
             for i, segment in enumerate(raw_segments):
+                # Extract and validate timing
+                start_time = segment.get("start", 0.0)
+                end_time = segment.get("end", 0.0)
+                text = segment.get("text", "").strip()
+                
+                # Skip segments with invalid timing or empty text
+                if not text or end_time <= start_time:
+                    continue
+                
                 # Detect paragraph boundaries using various heuristics
                 is_paragraph_start = self._detect_paragraph_boundary(
                     segment, 
@@ -237,9 +308,9 @@ class TranscriptionService:
                 )
                 
                 transcription_segment = TranscriptionSegment(
-                    start_time=segment.get("start", 0.0),
-                    end_time=segment.get("end", 0.0),
-                    text=segment.get("text", "").strip(),
+                    start_time=start_time,
+                    end_time=end_time,
+                    text=text,
                     is_paragraph_start=is_paragraph_start
                 )
                 
