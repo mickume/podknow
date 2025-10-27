@@ -84,12 +84,12 @@ class ConfigManager:
             except yaml.YAMLError as e:
                 raise ConfigurationError(f"Invalid YAML in configuration: {str(e)}")
         
-        # Extract prompt templates
+        # Extract prompt templates (with flexible whitespace handling)
         prompt_sections = {
-            'summary': r'### Summary Prompt\n```\n(.*?)\n```',
-            'topics': r'### Topic Extraction Prompt\n```\n(.*?)\n```',
-            'keywords': r'### Keyword Identification Prompt\n```\n(.*?)\n```',
-            'sponsor_detection': r'### Sponsor Detection Prompt\n```\n(.*?)\n```'
+            'summary': r'### Summary Prompt\s*\n```\n(.*?)\n```',
+            'topics': r'### Topic Extraction Prompt\s*\n```\n(.*?)\n```',
+            'keywords': r'### Keyword Identification Prompt\s*\n```\n(.*?)\n```',
+            'sponsor_detection': r'### Sponsor Detection Prompt\s*\n```\n(.*?)\n```'
         }
         
         for prompt_type, pattern in prompt_sections.items():
