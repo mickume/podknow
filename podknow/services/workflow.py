@@ -382,36 +382,40 @@ class WorkflowOrchestrator:
             except Exception as e:
                 raise AudioProcessingError(f"Audio download failed: {str(e)}")
             
-            # Step 3: Language detection (optional)
-            if not skip_language_detection:
-                state.set_step("language_detection")
-                self.progress_callback("Detecting audio language...")
-                
-                try:
-                    detected_language = self.transcription_service.detect_language(
-                        audio_file_path, 
-                        skip_minutes=language_detection_skip_minutes
-                    )
-                    self.logger.debug(f"Detected language: {detected_language}")
-                except LanguageDetectionError as e:
-                    self._cleanup_audio_file(audio_file_path)
-                    raise e
-            else:
-                self.logger.debug("Skipping language detection (assuming English)")
-                detected_language = "en"
-            
-            # Step 4: Transcription
-            state.set_step("transcription")
-            self.progress_callback("Transcribing audio (this may take several minutes)...")
+            # Step 3-6: Unified processing (language detection, transcription, analysis)
+            state.set_step("processing")
+            self.progress_callback("Processing audio...")
             
             try:
-                transcription_result = self.transcription_service.transcribe_audio(audio_file_path)
+                transcription_result, analysis_result, detected_language = self._execute_processing_steps(
+                    audio_file_path, 
+                    skip_language_detection, 
+                    language_detection_skip_minutes, 
+                    skip_analysis, 
+                    claude_api_key
+                )
+                
                 state.transcription_result = transcription_result
+                state.analysis_result = analysis_result
+                
+                self.logger.debug(f"Detected language: {detected_language}")
                 self.logger.info(f"Transcription completed: {len(transcription_result.segments)} segments, "
                                f"confidence: {transcription_result.confidence:.1%}")
+                
+                if analysis_result:
+                    self.logger.info(f"Analysis completed: {len(analysis_result.topics)} topics, "
+                                   f"{len(analysis_result.keywords)} keywords")
+                    if analysis_result.sponsor_segments:
+                        self.logger.info(f"Detected {len(analysis_result.sponsor_segments)} sponsor segments")
+                
             except Exception as e:
                 self._cleanup_audio_file(audio_file_path)
-                raise TranscriptionError(f"Transcription failed: {str(e)}")
+                if isinstance(e, LanguageDetectionError):
+                    raise e
+                elif isinstance(e, TranscriptionError):
+                    raise e
+                else:
+                    raise TranscriptionError(f"Processing failed: {str(e)}")
             
             # Step 5: Create episode metadata
             episode_metadata = EpisodeMetadata(
@@ -424,35 +428,12 @@ class WorkflowOrchestrator:
                 audio_url=episode.audio_url
             )
             
-            # Step 6: Analysis (if requested)
-            analysis_result = None
-            if not skip_analysis and claude_api_key:
-                state.set_step("analysis")
-                self.progress_callback("Analyzing transcription with Claude AI...")
-                
-                try:
-                    analysis_service = self.get_analysis_service(claude_api_key)
-                    analysis_result = analysis_service.analyze_transcription(transcription_result.text)
-                    state.analysis_result = analysis_result
-                    
-                    self.logger.info(f"Analysis completed: {len(analysis_result.topics)} topics, "
-                                   f"{len(analysis_result.keywords)} keywords")
-                    
-                    if analysis_result.sponsor_segments:
-                        self.logger.info(f"Detected {len(analysis_result.sponsor_segments)} sponsor segments")
-                        
-                except Exception as e:
-                    # Analysis failure is not fatal - continue with transcription only
-                    state.add_warning("analysis", f"Analysis failed: {str(e)}")
-                    self.logger.warning(f"Analysis failed, continuing with transcription only: {e}")
-                    skip_analysis = True
-            
-            # Step 7: Generate output
+            # Step 6: Generate output
             state.set_step("output_generation")
             self.progress_callback("Generating output file...")
             
             try:
-                if skip_analysis or not analysis_result:
+                if skip_analysis or not state.analysis_result:
                     # Generate transcription-only output
                     output_path = self.transcription_service.generate_markdown_output(
                         transcription_result, 
@@ -464,7 +445,7 @@ class WorkflowOrchestrator:
                     output_doc = OutputDocument(
                         metadata=episode_metadata,
                         transcription=transcription_result.text,
-                        analysis=analysis_result,
+                        analysis=state.analysis_result,
                         processing_timestamp=datetime.now()
                     )
                     
@@ -585,6 +566,128 @@ class WorkflowOrchestrator:
                 self.logger.debug(f"Cleaned up audio file: {audio_path}")
         except Exception as e:
             self.logger.warning(f"Failed to cleanup audio file {audio_path}: {e}")
+    
+    def _execute_processing_steps(self, audio_file_path: str, skip_language_detection: bool, 
+                                language_detection_skip_minutes: float, skip_analysis: bool, 
+                                claude_api_key: Optional[str]) -> tuple:
+        """Execute processing steps with unified progress bar.
+        
+        Returns:
+            tuple: (transcription_result, analysis_result, detected_language)
+        """
+        try:
+            from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+            rich_available = True
+        except ImportError:
+            rich_available = False
+        
+        if rich_available:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[bold blue]{task.description}"),
+                BarColumn(bar_width=None),
+                TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                TextColumn("•"),
+                TimeElapsedColumn(),
+                refresh_per_second=4,
+            ) as progress:
+                
+                task = progress.add_task("Processing audio", total=100)
+                
+                # Language detection
+                if not skip_language_detection:
+                    progress.update(task, description="[bold blue]Detecting language")
+                    detected_language = self._detect_language_with_progress(
+                        audio_file_path, language_detection_skip_minutes
+                    )
+                    progress.update(task, completed=20)
+                else:
+                    detected_language = "en"
+                
+                # Transcription
+                progress.update(task, description="[bold blue]Transcribing audio")
+                transcription_result = self._transcribe_with_progress(audio_file_path)
+                progress.update(task, completed=60)
+                
+                # Analysis
+                analysis_result = None
+                if not skip_analysis and claude_api_key:
+                    analysis_result = self._analyze_with_progress(
+                        transcription_result.text, claude_api_key, progress, task
+                    )
+                    progress.update(task, completed=100)
+                else:
+                    progress.update(task, description="[bold blue]Processing complete")
+                    progress.update(task, completed=100)
+        
+        else:
+            # Fallback without rich progress bars
+            if not skip_language_detection:
+                print("Detecting language...")
+                detected_language = self.transcription_service.detect_language(
+                    audio_file_path, skip_minutes=language_detection_skip_minutes
+                )
+            else:
+                detected_language = "en"
+            
+            print("Transcribing audio...")
+            transcription_result = self.transcription_service.transcribe_audio(audio_file_path)
+            
+            analysis_result = None
+            if not skip_analysis and claude_api_key:
+                print("Analyzing content...")
+                analysis_service = self.get_analysis_service(claude_api_key)
+                analysis_result = analysis_service.analyze_transcription(transcription_result.text)
+        
+        return transcription_result, analysis_result, detected_language
+    
+    def _detect_language_with_progress(self, audio_path: str, skip_minutes: float) -> str:
+        """Detect language without showing individual progress bars."""
+        return self.transcription_service.detect_language(audio_path, skip_minutes, suppress_progress=True)
+    
+    def _transcribe_with_progress(self, audio_path: str):
+        """Transcribe audio without showing individual progress bars."""
+        return self.transcription_service.transcribe_audio(audio_path, suppress_progress=True)
+    
+    def _analyze_with_progress(self, transcription_text: str, claude_api_key: str, 
+                             progress, task):
+        """Analyze transcription with step-by-step progress updates."""
+        analysis_service = self.get_analysis_service(claude_api_key)
+        
+        # Perform analysis steps individually to show progress
+        try:
+            # Step 1: Summary (75%)
+            progress.update(task, description="[bold blue]Generating summary")
+            summary = analysis_service.generate_summary(transcription_text, show_progress=False)
+            progress.update(task, completed=75)
+            
+            # Step 2: Topics (85%)
+            progress.update(task, description="[bold blue]Extracting topics")
+            topics = analysis_service.extract_topics(transcription_text, show_progress=False)
+            progress.update(task, completed=85)
+            
+            # Step 3: Keywords (95%)
+            progress.update(task, description="[bold blue]Identifying keywords")
+            keywords = analysis_service.identify_keywords(transcription_text, show_progress=False)
+            progress.update(task, completed=95)
+            
+            # Step 4: Sponsors (100%)
+            progress.update(task, description="[bold blue]Detecting sponsors")
+            sponsor_segments = analysis_service.detect_sponsor_content(transcription_text, show_progress=False)
+            
+            # Create analysis result
+            from ..models.analysis import AnalysisResult
+            return AnalysisResult(
+                summary=summary,
+                topics=topics,
+                keywords=keywords,
+                sponsor_segments=sponsor_segments
+            )
+            
+        except Exception as e:
+            # If analysis fails, return None and let the workflow handle it
+            print(f"Warning: Analysis failed: {e}")
+            return None
     
     def get_workflow_status(self) -> Dict[str, Any]:
         """Get current workflow status and health information."""

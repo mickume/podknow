@@ -134,7 +134,7 @@ class TranscriptionService:
         
         return False
     
-    def detect_language(self, audio_path: str, skip_minutes: float = 2.0, sample_duration: float = 30.0) -> str:
+    def detect_language(self, audio_path: str, skip_minutes: float = 2.0, sample_duration: float = 30.0, suppress_progress: bool = False) -> str:
         """
         Detect the language of the audio file using MLX-Whisper.
         Skips the first few minutes to avoid ads/intros in different languages.
@@ -155,6 +155,7 @@ class TranscriptionService:
             import mlx_whisper
             import sys
             import os
+            import time
             from contextlib import redirect_stdout, redirect_stderr
             from io import StringIO
             
@@ -166,52 +167,66 @@ class TranscriptionService:
             sample_path = self._create_audio_sample(audio_path, skip_minutes, sample_duration)
             
             try:
-                # Show progress for language detection
-                from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
-                import threading
-                import time
-                
-                with Progress(
-                    SpinnerColumn(),
-                    TextColumn("[bold yellow]Detecting language"),
-                    TextColumn("•"),
-                    TimeElapsedColumn(),
-                    refresh_per_second=4,
-                ) as progress:
+                if not suppress_progress:
+                    # Show progress for language detection
+                    from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+                    import threading
                     
-                    task = progress.add_task("language_detection", total=None)
-                    
-                    # Function to run language detection in background
-                    def run_language_detection():
-                        nonlocal result
-                        # Suppress MLX-Whisper model download progress
-                        with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
-                            # Use MLX-Whisper to detect language on the sample
-                            result = mlx_whisper.transcribe(
-                                sample_path,
-                                language=None,  # Auto-detect
-                                task="transcribe",
-                                word_timestamps=False,
-                                condition_on_previous_text=False,
-                                initial_prompt=None,
-                                fp16=True  # Use half precision for speed
-                            )
-                    
-                    # Start language detection in background thread
-                    result = None
-                    detection_thread = threading.Thread(target=run_language_detection)
-                    detection_thread.start()
-                    
-                    # Update progress while detection is running
-                    while detection_thread.is_alive():
-                        progress.update(task, advance=0.1)
-                        time.sleep(0.1)
-                    
-                    # Wait for detection to complete
-                    detection_thread.join()
-                    
-                    # Mark as completed
-                    progress.update(task, completed=True)
+                    with Progress(
+                        SpinnerColumn(),
+                        TextColumn("[bold yellow]Detecting language"),
+                        TextColumn("•"),
+                        TimeElapsedColumn(),
+                        refresh_per_second=4,
+                    ) as progress:
+                        
+                        task = progress.add_task("language_detection", total=None)
+                        
+                        # Function to run language detection in background
+                        def run_language_detection():
+                            nonlocal result
+                            # Suppress MLX-Whisper model download progress
+                            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                                # Use MLX-Whisper to detect language on the sample
+                                result = mlx_whisper.transcribe(
+                                    sample_path,
+                                    language=None,  # Auto-detect
+                                    task="transcribe",
+                                    word_timestamps=False,
+                                    condition_on_previous_text=False,
+                                    initial_prompt=None,
+                                    fp16=True  # Use half precision for speed
+                                )
+                        
+                        # Start language detection in background thread
+                        result = None
+                        detection_thread = threading.Thread(target=run_language_detection)
+                        detection_thread.start()
+                        
+                        # Update progress while detection is running
+                        while detection_thread.is_alive():
+                            progress.update(task, advance=0.1)
+                            time.sleep(0.1)
+                        
+                        # Wait for detection to complete
+                        detection_thread.join()
+                        
+                        # Mark as completed
+                        progress.update(task, completed=True)
+                else:
+                    # Direct execution without progress bar
+                    # Suppress MLX-Whisper model download progress
+                    with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                        # Use MLX-Whisper to detect language on the sample
+                        result = mlx_whisper.transcribe(
+                            sample_path,
+                            language=None,  # Auto-detect
+                            task="transcribe",
+                            word_timestamps=False,
+                            condition_on_previous_text=False,
+                            initial_prompt=None,
+                            fp16=True  # Use half precision for speed
+                        )
                 
                 detected_language = result.get("language", "unknown")
                 
@@ -314,7 +329,7 @@ class TranscriptionService:
         except Exception as e:
             raise AudioProcessingError(f"Failed to create audio sample: {str(e)}")
     
-    def transcribe_audio(self, audio_path: str) -> TranscriptionResult:
+    def transcribe_audio(self, audio_path: str, suppress_progress: bool = False) -> TranscriptionResult:
         """
         Transcribe audio file using MLX-Whisper with paragraph detection.
         
@@ -332,6 +347,7 @@ class TranscriptionService:
             import mlx_whisper
             import sys
             import os
+            import time
             from contextlib import redirect_stdout, redirect_stderr
             from io import StringIO
             
@@ -339,80 +355,99 @@ class TranscriptionService:
             if not os.path.exists(audio_path):
                 raise AudioProcessingError(f"Audio file not found: {audio_path}")
             
-            print(f"Starting transcription of {audio_path}...")
+            # Record start time for performance metrics
+            start_time = time.time()
+            
+            if not suppress_progress:
+                print(f"Starting transcription of {audio_path}...")
             
             # Get audio duration for progress estimation
             audio_duration = self._get_audio_duration(audio_path)
             
-            # Create progress bar for transcription
-            from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn, BarColumn
-            import threading
-            import time
-            
-            # Estimate transcription time (typically 10-20% of audio duration for MLX-Whisper)
-            estimated_time = max(audio_duration * 0.15, 10.0) if audio_duration > 0 else None
-            
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[bold blue]Transcribing audio"),
-                BarColumn(bar_width=None) if estimated_time else TextColumn(""),
-                TextColumn("[progress.percentage]{task.percentage:>3.0f}%") if estimated_time else TextColumn(""),
-                TextColumn("•"),
-                TimeElapsedColumn(),
-                refresh_per_second=4,
-            ) as progress:
+            if not suppress_progress:
+                # Create progress bar for transcription
+                from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn, BarColumn
+                import threading
                 
-                # Add transcription task with estimated total if available
-                if estimated_time:
-                    task = progress.add_task("transcription", total=100)
-                    duration_text = f" ({audio_duration:.1f}s audio)" if audio_duration > 0 else ""
-                    progress.update(task, description=f"[bold blue]Transcribing audio{duration_text}")
-                else:
-                    task = progress.add_task("transcription", total=None)
+                # Estimate transcription time (typically 10-20% of audio duration for MLX-Whisper)
+                estimated_time = max(audio_duration * 0.15, 10.0) if audio_duration > 0 else None
                 
-                # Function to run transcription in background
-                def run_transcription():
-                    nonlocal result
-                    # Suppress MLX-Whisper model download progress
-                    with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
-                        # Perform transcription with word timestamps for paragraph detection
-                        result = mlx_whisper.transcribe(
-                            audio_path,
-                            language="en",  # We've already validated it's English
-                            task="transcribe",
-                            word_timestamps=True,  # Enable for paragraph detection
-                            condition_on_previous_text=True,
-                            fp16=True,  # Use half precision for Apple Silicon optimization
-                            prepend_punctuations="\"'([{-",
-                            append_punctuations="\"'.,:!?)]}-"
-                        )
-                
-                # Start transcription in background thread
-                result = None
-                transcription_thread = threading.Thread(target=run_transcription)
-                transcription_thread.start()
-                start_time = time.time()
-                
-                # Update progress while transcription is running
-                while transcription_thread.is_alive():
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[bold blue]Transcribing audio"),
+                    BarColumn(bar_width=None) if estimated_time else TextColumn(""),
+                    TextColumn("[progress.percentage]{task.percentage:>3.0f}%") if estimated_time else TextColumn(""),
+                    TextColumn("•"),
+                    TimeElapsedColumn(),
+                    refresh_per_second=4,
+                ) as progress:
+                    
+                    # Add transcription task with estimated total if available
                     if estimated_time:
-                        # Calculate progress based on elapsed time vs estimated time
-                        elapsed = time.time() - start_time
-                        progress_percent = min((elapsed / estimated_time) * 100, 95)  # Cap at 95% until done
-                        progress.update(task, completed=progress_percent)
+                        task = progress.add_task("transcription", total=100)
+                        duration_text = f" ({audio_duration:.1f}s audio)" if audio_duration > 0 else ""
+                        progress.update(task, description=f"[bold blue]Transcribing audio{duration_text}")
                     else:
-                        # Just show activity
-                        progress.update(task, advance=0.1)
-                    time.sleep(0.25)
-                
-                # Wait for transcription to complete
-                transcription_thread.join()
-                
-                # Mark as completed
-                if estimated_time:
-                    progress.update(task, completed=100)
-                else:
-                    progress.update(task, completed=True)
+                        task = progress.add_task("transcription", total=None)
+                    
+                    # Function to run transcription in background
+                    def run_transcription():
+                        nonlocal result
+                        # Suppress MLX-Whisper model download progress
+                        with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                            # Perform transcription with word timestamps for paragraph detection
+                            result = mlx_whisper.transcribe(
+                                audio_path,
+                                language="en",  # We've already validated it's English
+                                task="transcribe",
+                                word_timestamps=True,  # Enable for paragraph detection
+                                condition_on_previous_text=True,
+                                fp16=True,  # Use half precision for Apple Silicon optimization
+                                prepend_punctuations="\"'([{-",
+                                append_punctuations="\"'.,:!?)]}-"
+                            )
+                    
+                    # Start transcription in background thread
+                    result = None
+                    transcription_thread = threading.Thread(target=run_transcription)
+                    transcription_thread.start()
+                    start_time = time.time()
+                    
+                    # Update progress while transcription is running
+                    while transcription_thread.is_alive():
+                        if estimated_time:
+                            # Calculate progress based on elapsed time vs estimated time
+                            elapsed = time.time() - start_time
+                            progress_percent = min((elapsed / estimated_time) * 100, 95)  # Cap at 95% until done
+                            progress.update(task, completed=progress_percent)
+                        else:
+                            # Just show activity
+                            progress.update(task, advance=0.1)
+                        time.sleep(0.25)
+                    
+                    # Wait for transcription to complete
+                    transcription_thread.join()
+                    
+                    # Mark as completed
+                    if estimated_time:
+                        progress.update(task, completed=100)
+                    else:
+                        progress.update(task, completed=True)
+            else:
+                # Direct execution without progress bar
+                # Suppress MLX-Whisper model download progress
+                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                    # Perform transcription with word timestamps for paragraph detection
+                    result = mlx_whisper.transcribe(
+                        audio_path,
+                        language="en",  # We've already validated it's English
+                        task="transcribe",
+                        word_timestamps=True,  # Enable for paragraph detection
+                        condition_on_previous_text=True,
+                        fp16=True,  # Use half precision for Apple Silicon optimization
+                        prepend_punctuations="\"'([{-",
+                        append_punctuations="\"'.,:!?)]}-"
+                    )
             
             # Extract basic transcription info
             full_text = result.get("text", "").strip()

@@ -2,6 +2,8 @@ README.md
 pyproject.toml
 setup.py
 podknow/__init__.py
+podknow/__main__.py
+podknow/constants.py
 podknow/exceptions.py
 podknow.egg-info/PKG-INFO
 podknow.egg-info/SOURCES.txt
