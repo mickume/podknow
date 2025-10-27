@@ -309,22 +309,38 @@ If no sponsor content is found, return an empty array: []"""
                     
                     # Step 1: Generate summary (25% of progress)
                     progress.update(analysis_task, description="[bold green]Generating summary")
-                    summary = self.generate_summary(transcription, show_progress=False)
+                    try:
+                        summary = self.generate_summary(transcription, show_progress=False)
+                    except Exception as e:
+                        print(f"Warning: Summary generation failed: {e}")
+                        summary = "Summary generation failed."
                     progress.update(analysis_task, completed=25)
                     
                     # Step 2: Extract topics (50% of progress)
                     progress.update(analysis_task, description="[bold green]Extracting topics")
-                    topics = self.extract_topics(transcription, show_progress=False)
+                    try:
+                        topics = self.extract_topics(transcription, show_progress=False)
+                    except Exception as e:
+                        print(f"Warning: Topic extraction failed: {e}")
+                        topics = []
                     progress.update(analysis_task, completed=50)
                     
                     # Step 3: Identify keywords (75% of progress)
                     progress.update(analysis_task, description="[bold green]Identifying keywords")
-                    keywords = self.identify_keywords(transcription, show_progress=False)
+                    try:
+                        keywords = self.identify_keywords(transcription, show_progress=False)
+                    except Exception as e:
+                        print(f"Warning: Keyword identification failed: {e}")
+                        keywords = []
                     progress.update(analysis_task, completed=75)
                     
                     # Step 4: Detect sponsor content (100% of progress)
                     progress.update(analysis_task, description="[bold green]Detecting sponsor content")
-                    sponsor_segments = self.detect_sponsor_content(transcription, show_progress=False)
+                    try:
+                        sponsor_segments = self.detect_sponsor_content(transcription, show_progress=False)
+                    except Exception as e:
+                        print(f"Warning: Sponsor detection failed: {e}")
+                        sponsor_segments = []
                     progress.update(analysis_task, completed=100)
                     
                     # Calculate analysis time
@@ -334,16 +350,32 @@ If no sponsor content is found, return an empty array: []"""
                 start_time = time.time()
                 
                 print("Generating summary...")
-                summary = self.generate_summary(transcription, show_progress=False)
+                try:
+                    summary = self.generate_summary(transcription, show_progress=False)
+                except Exception as e:
+                    print(f"Warning: Summary generation failed: {e}")
+                    summary = "Summary generation failed."
                 
                 print("Extracting topics...")
-                topics = self.extract_topics(transcription, show_progress=False)
+                try:
+                    topics = self.extract_topics(transcription, show_progress=False)
+                except Exception as e:
+                    print(f"Warning: Topic extraction failed: {e}")
+                    topics = []
                 
                 print("Identifying keywords...")
-                keywords = self.identify_keywords(transcription, show_progress=False)
+                try:
+                    keywords = self.identify_keywords(transcription, show_progress=False)
+                except Exception as e:
+                    print(f"Warning: Keyword identification failed: {e}")
+                    keywords = []
                 
                 print("Detecting sponsor content...")
-                sponsor_segments = self.detect_sponsor_content(transcription, show_progress=False)
+                try:
+                    sponsor_segments = self.detect_sponsor_content(transcription, show_progress=False)
+                except Exception as e:
+                    print(f"Warning: Sponsor detection failed: {e}")
+                    sponsor_segments = []
                 
                 analysis_time = time.time() - start_time
             
@@ -457,9 +489,15 @@ If no sponsor content is found, return an empty array: []"""
     def detect_sponsor_content(self, transcription: str, show_progress: bool = True) -> List[SponsorSegment]:
         """Detect sponsor content segments in transcription."""
         if not transcription or not transcription.strip():
-            raise AnalysisError("Transcription text is required for sponsor detection")
+            print("Warning: Empty transcription provided for sponsor detection")
+            return []
         
         try:
+            # Check if sponsors prompt is available
+            if 'sponsors' not in self.prompts:
+                print("Warning: Sponsor detection prompt not available, skipping sponsor detection")
+                return []
+            
             prompt = f"{self.prompts['sponsors']}\n\nTranscription:\n{transcription}"
             response = self.claude_client.send_message(prompt, show_progress=show_progress)
             
@@ -470,7 +508,8 @@ If no sponsor content is found, return an empty array: []"""
             try:
                 sponsor_data = json.loads(response.strip())
                 if not isinstance(sponsor_data, list):
-                    raise ValueError("Response must be a JSON array")
+                    print("Warning: Claude returned invalid sponsor data format, skipping sponsor detection")
+                    return []
                 
                 sponsor_segments = []
                 for item in sponsor_data:
@@ -492,12 +531,17 @@ If no sponsor content is found, return an empty array: []"""
                 
             except (json.JSONDecodeError, ValueError, KeyError) as e:
                 # If JSON parsing fails, assume no sponsor content
+                print(f"Warning: Failed to parse sponsor detection response: {e}")
                 return []
             
-        except ClaudeAPIError:
-            raise
+        except ClaudeAPIError as e:
+            # Claude API errors should be warnings for sponsor detection
+            print(f"Warning: Claude API error during sponsor detection: {e}")
+            return []
         except Exception as e:
-            raise AnalysisError(f"Failed to detect sponsor content: {str(e)}")
+            # Other errors should also be warnings for sponsor detection
+            print(f"Warning: Failed to detect sponsor content: {e}")
+            return []
     
     def generate_markdown_output(self, output_doc: OutputDocument) -> str:
         """Generate markdown output with analysis results integrated.
