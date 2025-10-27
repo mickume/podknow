@@ -19,7 +19,6 @@ from ..models.transcription import TranscriptionResult
 from ..models.analysis import AnalysisResult
 from ..models.output import OutputDocument
 from ..utils.progress import ProgressContext
-import logging
 
 logger = logging.getLogger(__name__)
 from ..services.discovery import PodcastDiscoveryService

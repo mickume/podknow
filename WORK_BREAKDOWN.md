@@ -1284,44 +1284,38 @@ scripts/list_todos.py
 
 ---
 
-### ISSUE-016: Unused Exception Import in Workflow
+### ISSUE-016: Unused Exception Import in Workflow ✅ **RESOLVED**
 
 **Severity:** 🔵 Low
 **Type:** Code Quality
 **Labels:** `enhancement`, `low-priority`, `cleanup`
+**Resolution Date:** 2025-10-27
 
 **Description:**
-`EpisodeManagementError` is imported but never used in workflow orchestrator.
+Duplicate `import logging` statement and unused exception imports in workflow orchestrator needed cleanup.
 
 **Files Affected:**
-- `podknow/services/workflow.py` (line 27)
+- `podknow/services/workflow.py` ✅ Fixed
 
-**Current Code:**
-```python
-from ..exceptions import (
-    PodKnowError,
-    NetworkError,
-    TranscriptionError,
-    AnalysisError,
-    ConfigurationError,
-    AudioProcessingError,
-    LanguageDetectionError,
-    FileOperationError,
-    EpisodeManagementError  # Never used
-)
-```
+**Issue Found:**
+Upon investigation, `EpisodeManagementError` was already removed from imports. However, found a duplicate `import logging` statement:
+- Line 8: `import logging`
+- Line 21: `import logging` (duplicate - removed)
 
-**Proposed Solution:**
-Either:
-1. Remove unused import if not needed
-2. Add proper error handling if it should be used
+**Solution Implemented:**
+Removed duplicate `import logging` statement from line 21, keeping only the first import at line 8.
+
+**Verification:**
+- ✅ Module imports successfully
+- ✅ All CLI integration tests pass (31/31)
+- ✅ No import-related warnings
 
 **Acceptance Criteria:**
-- [ ] Verify exception is truly unused
-- [ ] Remove import or add proper usage
-- [ ] No linting warnings
+- [x] Verify exception is truly unused
+- [x] Remove import or add proper usage
+- [x] No linting warnings
 
-**Estimated Effort:** 10 minutes
+**Time Spent:** 5 minutes
 
 ---
 
