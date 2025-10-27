@@ -366,31 +366,38 @@ sponsor_segments_detected: {len(analysis.sponsor_segments)}
         return "\n".join(topics_list)
     
     def _generate_transcription_section(self, transcription: str, sponsor_segments: List[SponsorSegment]) -> str:
-        """Generate transcription section with sponsor content marked."""
+        """Generate transcription section with sponsor content marked.
+        
+        Preserves original Whisper paragraph formatting while adding sponsor markers.
+        """
+        # Always start with the original transcription to preserve Whisper's paragraph detection
         if not sponsor_segments:
             return transcription
         
-        # Mark sponsor content in transcription
+        # Work with the original transcription to preserve formatting
         marked_transcription = transcription
         
-        # Sort sponsor segments by their position in the text (based on start_text)
+        # Find sponsor segments in the text with fuzzy matching
         segments_with_positions = []
         for segment in sponsor_segments:
-            start_pos = marked_transcription.find(segment.start_text)
+            # Try to find the start and end text with some flexibility
+            start_pos = self._find_text_position(marked_transcription, segment.start_text)
             if start_pos != -1:
-                end_pos = marked_transcription.find(segment.end_text, start_pos)
+                end_pos = self._find_text_position(marked_transcription, segment.end_text, start_pos)
                 if end_pos != -1:
                     end_pos += len(segment.end_text)
                     segments_with_positions.append((start_pos, end_pos, segment))
         
-        # Sort by start position (reverse order to avoid position shifts)
+        # Sort by start position (reverse order to avoid position shifts when inserting)
         segments_with_positions.sort(key=lambda x: x[0], reverse=True)
         
-        # Insert sponsor markers
+        # Insert sponsor markers while preserving paragraph breaks
         for start_pos, end_pos, segment in segments_with_positions:
             confidence_percent = int(segment.confidence * 100)
-            sponsor_start = f"\n\n**[SPONSOR CONTENT START - {confidence_percent}% confidence]**\n\n"
-            sponsor_end = f"\n\n**[SPONSOR CONTENT END]**\n\n"
+            
+            # Use more subtle markers that don't disrupt paragraph flow
+            sponsor_start = f"**[SPONSOR START - {confidence_percent}%]** "
+            sponsor_end = f" **[SPONSOR END]**"
             
             marked_transcription = (
                 marked_transcription[:start_pos] + 
@@ -401,3 +408,25 @@ sponsor_segments_detected: {len(analysis.sponsor_segments)}
             )
         
         return marked_transcription
+    
+    def _find_text_position(self, text: str, search_text: str, start_from: int = 0) -> int:
+        """Find text position with some flexibility for minor variations."""
+        # First try exact match
+        pos = text.find(search_text, start_from)
+        if pos != -1:
+            return pos
+        
+        # If exact match fails, try with normalized whitespace
+        normalized_search = ' '.join(search_text.split())
+        normalized_text = ' '.join(text.split())
+        
+        pos = normalized_text.find(normalized_search, start_from)
+        if pos != -1:
+            # Convert position back to original text
+            # This is approximate but should work for most cases
+            words_before = len(normalized_text[:pos].split())
+            original_words = text.split()
+            if words_before < len(original_words):
+                return text.find(original_words[words_before])
+        
+        return -1
