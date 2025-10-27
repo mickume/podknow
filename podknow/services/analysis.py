@@ -122,7 +122,7 @@ Return only the topic sentences, one per line, without numbering or bullets.""",
             
             "keywords": """Identify relevant keywords and tags for this podcast content. 
 Focus on specific terms, concepts, people, companies, or technologies mentioned. 
-Return only the keywords separated by commas, without explanations.""",
+Return ONLY the keywords separated by commas. Do not include any explanatory text, introductions, or additional commentary. Just the keywords.""",
             
             "sponsors": """Identify any sponsored content or advertisements in this transcription. 
 Look for promotional language, product endorsements, discount codes, or clear advertising segments.
@@ -213,8 +213,26 @@ If no sponsor content is found, return an empty array: []"""
             if not response or not response.strip():
                 raise AnalysisError("Claude API returned empty keywords response")
             
+            # Clean response by removing common prefatory text
+            cleaned_response = response.strip()
+            
+            # Remove common prefixes that Claude might add
+            prefixes_to_remove = [
+                "Here are the relevant keywords:",
+                "Here are the keywords:",
+                "Relevant keywords:",
+                "Keywords:",
+                "The relevant keywords are:",
+                "The keywords are:"
+            ]
+            
+            for prefix in prefixes_to_remove:
+                if cleaned_response.lower().startswith(prefix.lower()):
+                    cleaned_response = cleaned_response[len(prefix):].strip()
+                    break
+            
             # Split by commas and clean keywords
-            keywords = [keyword.strip() for keyword in response.strip().split(',') if keyword.strip()]
+            keywords = [keyword.strip() for keyword in cleaned_response.split(',') if keyword.strip()]
             
             if not keywords:
                 raise AnalysisError("No keywords extracted from transcription")
@@ -328,7 +346,6 @@ episode_number: {metadata.episode_number if metadata.episode_number else 'null'}
 publication_date: "{metadata.publication_date.strftime('%Y-%m-%d')}"
 duration: "{metadata.duration}"
 transcribed_at: "{output_doc.processing_timestamp.strftime('%Y-%m-%dT%H:%M:%SZ')}"
-description: "{metadata.description}"
 audio_url: "{metadata.audio_url}"
 keywords: {keywords_yaml}
 sponsor_segments_detected: {len(analysis.sponsor_segments)}
