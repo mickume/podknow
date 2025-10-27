@@ -15,17 +15,18 @@ from ..models.analysis import AnalysisResult, SponsorSegment
 from ..models.output import OutputDocument
 from ..models.episode import EpisodeMetadata
 from ..exceptions import AnalysisError, ClaudeAPIError, ConfigurationError
+from ..config.manager import ConfigManager
 
 
 class ClaudeAPIClient:
     """Claude API client with authentication, rate limiting, and error handling."""
     
-    def __init__(self, api_key: str, model: str = "claude-3-5-sonnet-20241022", max_retries: int = 3, retry_delay: float = 1.0):
+    def __init__(self, api_key: str, model: str = "claude-sonnet-4-5-20250929", max_retries: int = 3, retry_delay: float = 1.0):
         """Initialize Claude API client.
         
         Args:
             api_key: Claude API key
-            model: Claude model to use (default: claude-3-5-sonnet-20241022)
+            model: Claude model to use (default: claude-sonnet-4-5-20250929)
             max_retries: Maximum number of retry attempts
             retry_delay: Base delay between retries in seconds
         """
@@ -98,19 +99,51 @@ class ClaudeAPIClient:
 class AnalysisService:
     """Service for AI-powered content analysis using Claude API."""
     
-    def __init__(self, api_key: str, model: str = "claude-3-5-sonnet-20241022", prompts: Optional[Dict[str, str]] = None):
+    def __init__(self, api_key: str, model: str = "claude-sonnet-4-5-20250929", prompts: Optional[Dict[str, str]] = None):
         """Initialize analysis service.
         
         Args:
             api_key: Claude API key
-            model: Claude model to use (default: claude-3-5-sonnet-20241022)
+            model: Claude model to use (default: claude-sonnet-4-5-20250929)
             prompts: Optional custom prompts for different analysis types
         """
         self.claude_client = ClaudeAPIClient(api_key, model=model)
-        self.prompts = prompts or self._get_default_prompts()
+        self.prompts = prompts or self._load_prompts_from_config()
+    
+    def _load_prompts_from_config(self) -> Dict[str, str]:
+        """Load prompts from configuration file, with fallback to defaults."""
+        try:
+            config_manager = ConfigManager()
+            if config_manager.config_exists():
+                config = config_manager.load_config()
+                # Map config prompt names to service prompt names
+                prompt_mapping = {
+                    'summary': 'summary',
+                    'topics': 'topics', 
+                    'keywords': 'keywords',
+                    'sponsors': 'sponsor_detection'  # Config uses 'sponsor_detection', service uses 'sponsors'
+                }
+                
+                prompts = {}
+                for service_key, config_key in prompt_mapping.items():
+                    if config_key in config.prompts and config.prompts[config_key].strip():
+                        prompts[service_key] = config.prompts[config_key]
+                    else:
+                        # Use fallback for missing prompts
+                        prompts[service_key] = self._get_default_prompts()[service_key]
+                
+                return prompts
+            else:
+                # No config file, use defaults
+                return self._get_default_prompts()
+                
+        except Exception as e:
+            # If config loading fails, fall back to defaults
+            print(f"Warning: Failed to load prompts from config, using defaults: {e}")
+            return self._get_default_prompts()
     
     def _get_default_prompts(self) -> Dict[str, str]:
-        """Get default prompts for analysis tasks."""
+        """Get default prompts for analysis tasks (fallback)."""
         return {
             "summary": """Analyze this podcast transcription and provide a concise summary in 2-3 paragraphs. 
 Focus on the main points, key insights, and overall theme of the episode. 

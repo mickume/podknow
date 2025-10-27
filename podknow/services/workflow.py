@@ -22,6 +22,7 @@ from ..services.discovery import PodcastDiscoveryService
 from ..services.episode import EpisodeListingService
 from ..services.transcription import TranscriptionService
 from ..services.analysis import AnalysisService
+from ..config.manager import ConfigManager
 from ..exceptions import (
     PodKnowError,
     NetworkError,
@@ -202,10 +203,33 @@ class WorkflowOrchestrator:
             self._transcription_service = TranscriptionService()
         return self._transcription_service
     
-    def get_analysis_service(self, api_key: str, model: str = "claude-3-5-sonnet-20241022") -> AnalysisService:
-        """Get analysis service with API key and model."""
+    def get_analysis_service(self, api_key: str, model: str = "claude-sonnet-4-5-20250929") -> AnalysisService:
+        """Get analysis service with API key, model, and configuration-based prompts."""
         if self._analysis_service is None:
-            self._analysis_service = AnalysisService(api_key, model=model)
+            # Load prompts from configuration
+            try:
+                config_manager = ConfigManager()
+                if config_manager.config_exists():
+                    config = config_manager.load_config()
+                    # Map config prompt names to service prompt names
+                    prompts = {
+                        'summary': config.prompts.get('summary'),
+                        'topics': config.prompts.get('topics'),
+                        'keywords': config.prompts.get('keywords'),
+                        'sponsors': config.prompts.get('sponsor_detection')  # Config uses 'sponsor_detection'
+                    }
+                    # Filter out None values
+                    prompts = {k: v for k, v in prompts.items() if v is not None}
+                    
+                    self._analysis_service = AnalysisService(api_key, model=model, prompts=prompts if prompts else None)
+                else:
+                    # No config file, let AnalysisService use its defaults
+                    self._analysis_service = AnalysisService(api_key, model=model)
+            except Exception as e:
+                # If config loading fails, fall back to defaults
+                self.logger.warning(f"Failed to load configuration for analysis service: {e}")
+                self._analysis_service = AnalysisService(api_key, model=model)
+        
         return self._analysis_service
     
     def execute_search_workflow(self, 

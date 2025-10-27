@@ -171,7 +171,7 @@ Aim for 3-8 topics depending on the episode length and content diversity.
 Identify relevant keywords and tags for this podcast content. 
 Focus on specific terms, concepts, people, companies, technologies, or methodologies mentioned.
 Include both explicit mentions and implicit themes that would help categorize this content.
-Return only the keywords separated by commas, without explanations.
+Return ONLY the keywords separated by commas. Do not include any explanatory text, introductions, or additional commentary. Just the keywords.
 Prioritize terms that would be useful for search and categorization.
 ```
 
@@ -237,7 +237,7 @@ chunk_size: 8192
 
 ```yaml
 # Claude API settings
-claude_model: "claude-3-5-sonnet-20241022"
+claude_model: "claude-sonnet-4-5-20250929"
 max_tokens: 4000
 temperature: 0.1
 
@@ -286,10 +286,33 @@ similarity_threshold: 0.8
 
 ## Getting Started
 
-1. Set your Claude API key in the `claude_api_key` field above
-2. Optionally configure Spotify credentials for enhanced podcast discovery
-3. Customize the analysis prompts to match your needs
-4. Adjust output and logging settings as desired
+1. **Set your Claude API key** in the `claude_api_key` field above
+   - Get an API key from https://console.anthropic.com/
+   - Replace "your-claude-api-key-here" with your actual key
+
+2. **Optionally configure Spotify credentials** for enhanced podcast discovery
+   - Create a Spotify app at https://developer.spotify.com/
+   - Add the client ID and secret to the configuration above
+
+3. **Customize the analysis prompts** to match your specific needs
+   - Modify the prompts above to get the analysis style you want
+   - Each prompt can be completely rewritten to suit your use case
+
+4. **Adjust output and logging settings** as desired
+   - Change the output directory to your preferred location
+   - Modify logging levels and file locations
+
+## Environment Variables
+
+You can also use environment variables instead of editing this file:
+
+- `CLAUDE_API_KEY`: Claude API key for analysis
+- `SPOTIFY_CLIENT_ID`: Spotify app client ID  
+- `SPOTIFY_CLIENT_SECRET`: Spotify app client secret
+- `PODKNOW_OUTPUT_DIR`: Default output directory
+- `PODKNOW_LOG_LEVEL`: Logging level
+
+Environment variables take precedence over configuration file settings.
 
 For more information, see the PodKnow documentation.
 '''

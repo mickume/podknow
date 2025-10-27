@@ -10,6 +10,34 @@ from datetime import datetime
 
 from ..exceptions import PodKnowError, NetworkError
 from ..services.workflow import WorkflowOrchestrator
+from ..config.manager import ConfigManager
+
+
+def _ensure_config_exists(verbose: bool = False):
+    """Ensure configuration directory and file exist, create with defaults if not."""
+    try:
+        config_manager = ConfigManager()
+        
+        if not config_manager.config_exists():
+            if verbose:
+                click.echo("Configuration file not found, creating default configuration...")
+            
+            # Create the configuration directory and file
+            config_manager.create_default_config()
+            
+            if verbose:
+                click.echo(f"Created default configuration at: {config_manager.config_path}")
+                click.echo("Please edit the configuration file to add your API keys:")
+                click.echo(f"  nano {config_manager.config_path}")
+        else:
+            if verbose:
+                click.echo(f"Using configuration from: {config_manager.config_path}")
+                
+    except Exception as e:
+        if verbose:
+            click.echo(f"Warning: Failed to initialize configuration: {e}", err=True)
+        # Don't fail startup if config initialization fails
+        pass
 
 
 @click.group()
@@ -51,6 +79,9 @@ def cli(ctx: click.Context, verbose: bool, log_file: Optional[str]):
     ctx.ensure_object(dict)
     ctx.obj['verbose'] = verbose
     ctx.obj['log_file'] = log_file
+    
+    # Initialize configuration on startup
+    _ensure_config_exists(verbose)
     
     # Initialize workflow orchestrator
     ctx.obj['workflow'] = WorkflowOrchestrator(
@@ -354,11 +385,26 @@ def transcribe(
     if not (rss_url.startswith('http://') or rss_url.startswith('https://')):
         raise click.BadParameter("RSS URL must start with http:// or https://")
     
+    # Load Claude API key from configuration if not provided
+    if not skip_analysis and not claude_api_key:
+        try:
+            config_manager = ConfigManager()
+            if config_manager.config_exists():
+                config = config_manager.load_config()
+                claude_api_key = config.claude_api_key
+                if claude_api_key and claude_api_key != "your-claude-api-key-here":
+                    verbose_echo(ctx, "Using Claude API key from configuration file")
+                else:
+                    claude_api_key = None
+        except Exception as e:
+            verbose_echo(ctx, f"Warning: Failed to load configuration: {e}")
+    
     # Validate Claude API key if analysis is requested
     if not skip_analysis and not claude_api_key:
         raise click.BadParameter(
             "Claude API key is required for analysis. "
-            "Use --claude-api-key option or set CLAUDE_API_KEY environment variable. "
+            "Add your API key to ~/.podknow/config.md, "
+            "use --claude-api-key option, or set CLAUDE_API_KEY environment variable. "
             "Alternatively, use --skip-analysis to generate transcription only."
         )
     
@@ -404,7 +450,6 @@ def transcribe(
 @click.option(
     "--claude-api-key",
     envvar="CLAUDE_API_KEY",
-    required=True,
     help="Claude API key for analysis (can also be set via CLAUDE_API_KEY env var)"
 )
 @click.option(
@@ -416,7 +461,7 @@ def transcribe(
 def analyze(
     ctx: click.Context, 
     transcription_file: str, 
-    claude_api_key: str,
+    claude_api_key: Optional[str],
     output_file: Optional[str]
 ):
     """
@@ -433,6 +478,28 @@ def analyze(
     """
     if not os.path.isfile(transcription_file):
         raise click.BadParameter(f"Transcription file not found: {transcription_file}")
+    
+    # Load Claude API key from configuration if not provided
+    if not claude_api_key:
+        try:
+            config_manager = ConfigManager()
+            if config_manager.config_exists():
+                config = config_manager.load_config()
+                claude_api_key = config.claude_api_key
+                if claude_api_key and claude_api_key != "your-claude-api-key-here":
+                    verbose_echo(ctx, "Using Claude API key from configuration file")
+                else:
+                    claude_api_key = None
+        except Exception as e:
+            verbose_echo(ctx, f"Warning: Failed to load configuration: {e}")
+    
+    # Validate Claude API key
+    if not claude_api_key:
+        raise click.BadParameter(
+            "Claude API key is required for analysis. "
+            "Add your API key to ~/.podknow/config.md, "
+            "use --claude-api-key option, or set CLAUDE_API_KEY environment variable."
+        )
     
     try:
         verbose_echo(ctx, f"Starting analysis of {transcription_file}")
@@ -646,6 +713,53 @@ def verbose_echo(ctx: click.Context, message: str):
 def progress_echo(message: str, nl: bool = True):
     """Echo progress message to stderr."""
     click.echo(f"[INFO] {message}", err=True, nl=nl)
+
+
+@cli.command()
+@click.option(
+    "--force", "-f",
+    is_flag=True,
+    help="Overwrite existing configuration file"
+)
+@click.pass_context
+def setup(ctx: click.Context, force: bool):
+    """
+    Create or reset the PodKnow configuration file.
+    
+    This command creates a default configuration file at ~/.podknow/config.md
+    with example prompts and settings. Use --force to overwrite an existing file.
+    """
+    try:
+        config_manager = ConfigManager()
+        
+        if config_manager.config_exists() and not force:
+            click.echo(f"Configuration file already exists at: {config_manager.config_path}")
+            click.echo("Use --force to overwrite the existing configuration.")
+            click.echo("Or edit the existing file directly:")
+            click.echo(f"  nano {config_manager.config_path}")
+            return
+        
+        # Create the configuration
+        config_manager.create_default_config()
+        
+        click.echo("✅ Configuration file created successfully!")
+        click.echo(f"📁 Location: {config_manager.config_path}")
+        click.echo()
+        click.echo("🔧 Next steps:")
+        click.echo("1. Add your Claude API key to the configuration file")
+        click.echo("   - Get an API key from: https://console.anthropic.com/")
+        click.echo("2. Optionally add Spotify credentials for enhanced search")
+        click.echo("3. Customize the analysis prompts for your use case")
+        click.echo()
+        click.echo("📝 Edit configuration:")
+        click.echo(f"  nano {config_manager.config_path}")
+        click.echo()
+        click.echo("🔍 Check configuration status:")
+        click.echo("  podknow config-status")
+        
+    except Exception as e:
+        error_echo(f"Failed to create configuration: {e}")
+        sys.exit(1)
 
 
 def error_echo(message: str):
