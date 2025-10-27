@@ -73,17 +73,28 @@ class TranscriptionService:
             total_size = int(response.headers.get('content-length', 0))
             downloaded_size = 0
             
-            with open(temp_file_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-                        downloaded_size += len(chunk)
-                        
-                        # Simple progress indication (could be enhanced with callback)
-                        if total_size > 0:
-                            progress = (downloaded_size / total_size) * 100
-                            if downloaded_size % (1024 * 1024) == 0:  # Log every MB
-                                print(f"Download progress: {progress:.1f}%")
+            # Import rich for progress bar
+            from rich.progress import Progress, BarColumn, TextColumn, DownloadColumn, TransferSpeedColumn
+            
+            with Progress(
+                TextColumn("[bold blue]Downloading", justify="right"),
+                BarColumn(bar_width=None),
+                "[progress.percentage]{task.percentage:>3.1f}%",
+                "•",
+                DownloadColumn(),
+                "•",
+                TransferSpeedColumn(),
+                refresh_per_second=10,
+            ) as progress:
+                
+                task = progress.add_task("download", total=total_size)
+                
+                with open(temp_file_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                            downloaded_size += len(chunk)
+                            progress.update(task, advance=len(chunk))
             
             # Validate downloaded file
             if not os.path.exists(temp_file_path) or os.path.getsize(temp_file_path) == 0:
@@ -142,6 +153,10 @@ class TranscriptionService:
         """
         try:
             import mlx_whisper
+            import sys
+            import os
+            from contextlib import redirect_stdout, redirect_stderr
+            from io import StringIO
             
             # Validate audio file exists
             if not os.path.exists(audio_path):
@@ -151,16 +166,18 @@ class TranscriptionService:
             sample_path = self._create_audio_sample(audio_path, skip_minutes, sample_duration)
             
             try:
-                # Use MLX-Whisper to detect language on the sample
-                result = mlx_whisper.transcribe(
-                    sample_path,
-                    language=None,  # Auto-detect
-                    task="transcribe",
-                    word_timestamps=False,
-                    condition_on_previous_text=False,
-                    initial_prompt=None,
-                    fp16=True  # Use half precision for speed
-                )
+                # Suppress MLX-Whisper model download progress
+                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                    # Use MLX-Whisper to detect language on the sample
+                    result = mlx_whisper.transcribe(
+                        sample_path,
+                        language=None,  # Auto-detect
+                        task="transcribe",
+                        word_timestamps=False,
+                        condition_on_previous_text=False,
+                        initial_prompt=None,
+                        fp16=True  # Use half precision for speed
+                    )
                 
                 detected_language = result.get("language", "unknown")
                 
@@ -263,6 +280,10 @@ class TranscriptionService:
         """
         try:
             import mlx_whisper
+            import sys
+            import os
+            from contextlib import redirect_stdout, redirect_stderr
+            from io import StringIO
             
             # Validate audio file exists
             if not os.path.exists(audio_path):
@@ -270,17 +291,19 @@ class TranscriptionService:
             
             print(f"Starting transcription of {audio_path}...")
             
-            # Perform transcription with word timestamps for paragraph detection
-            result = mlx_whisper.transcribe(
-                audio_path,
-                language="en",  # We've already validated it's English
-                task="transcribe",
-                word_timestamps=True,  # Enable for paragraph detection
-                condition_on_previous_text=True,
-                fp16=True,  # Use half precision for Apple Silicon optimization
-                prepend_punctuations="\"'([{-",
-                append_punctuations="\"'.,:!?)]}-"
-            )
+            # Suppress MLX-Whisper model download progress
+            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                # Perform transcription with word timestamps for paragraph detection
+                result = mlx_whisper.transcribe(
+                    audio_path,
+                    language="en",  # We've already validated it's English
+                    task="transcribe",
+                    word_timestamps=True,  # Enable for paragraph detection
+                    condition_on_previous_text=True,
+                    fp16=True,  # Use half precision for Apple Silicon optimization
+                    prepend_punctuations="\"'([{-",
+                    append_punctuations="\"'.,:!?)]}-"
+                )
             
             # Extract basic transcription info
             full_text = result.get("text", "").strip()
