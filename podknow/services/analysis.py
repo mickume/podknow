@@ -5,6 +5,7 @@ Analysis service for AI-powered content analysis using Claude API.
 import json
 import time
 import re
+import logging
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 import anthropic
@@ -17,6 +18,8 @@ from ..models.episode import EpisodeMetadata
 from ..exceptions import AnalysisError, ClaudeAPIError, ConfigurationError
 from ..config.manager import ConfigManager
 from ..constants import DEFAULT_CLAUDE_MODEL
+
+logger = logging.getLogger(__name__)
 
 
 class ClaudeAPIClient:
@@ -152,7 +155,7 @@ class ClaudeAPIClient:
                     return response_result
             else:
                 # Fallback when rich is not available but progress is requested
-                print("Calling Claude API...")
+                logger.debug("Calling Claude API...")
                 # Fall through to synchronous implementation
         
         # Synchronous implementation (used when progress=False or rich not available)
@@ -241,7 +244,7 @@ class AnalysisService:
                 
         except Exception as e:
             # If config loading fails, fall back to defaults
-            print(f"Warning: Failed to load prompts from config, using defaults: {e}")
+            logger.warning(f"Failed to load prompts from config, using defaults: {e}")
             return self._get_default_prompts()
     
     def _get_default_prompts(self) -> Dict[str, str]:
@@ -309,7 +312,7 @@ If no sponsor content is found, return an empty array: []"""
                     try:
                         summary = self.generate_summary(transcription, show_progress=False)
                     except Exception as e:
-                        print(f"Warning: Summary generation failed: {e}")
+                        logger.warning(f"Summary generation failed: {e}")
                         summary = "Summary generation failed."
                     progress.update(analysis_task, completed=25)
                     
@@ -318,7 +321,7 @@ If no sponsor content is found, return an empty array: []"""
                     try:
                         topics = self.extract_topics(transcription, show_progress=False)
                     except Exception as e:
-                        print(f"Warning: Topic extraction failed: {e}")
+                        logger.warning(f"Topic extraction failed: {e}")
                         topics = []
                     progress.update(analysis_task, completed=50)
                     
@@ -327,7 +330,7 @@ If no sponsor content is found, return an empty array: []"""
                     try:
                         keywords = self.identify_keywords(transcription, show_progress=False)
                     except Exception as e:
-                        print(f"Warning: Keyword identification failed: {e}")
+                        logger.warning(f"Keyword identification failed: {e}")
                         keywords = []
                     progress.update(analysis_task, completed=75)
                     
@@ -336,7 +339,7 @@ If no sponsor content is found, return an empty array: []"""
                     try:
                         sponsor_segments = self.detect_sponsor_content(transcription, show_progress=False)
                     except Exception as e:
-                        print(f"Warning: Sponsor detection failed: {e}")
+                        logger.warning(f"Sponsor detection failed: {e}")
                         sponsor_segments = []
                     progress.update(analysis_task, completed=100)
                     
@@ -346,43 +349,43 @@ If no sponsor content is found, return an empty array: []"""
                 # Fallback when rich is not available
                 start_time = time.time()
                 
-                print("Generating summary...")
+                logger.info("Generating summary...")
                 try:
                     summary = self.generate_summary(transcription, show_progress=False)
                 except Exception as e:
-                    print(f"Warning: Summary generation failed: {e}")
+                    logger.warning(f"Summary generation failed: {e}")
                     summary = "Summary generation failed."
                 
-                print("Extracting topics...")
+                logger.info("Extracting topics...")
                 try:
                     topics = self.extract_topics(transcription, show_progress=False)
                 except Exception as e:
-                    print(f"Warning: Topic extraction failed: {e}")
+                    logger.warning(f"Topic extraction failed: {e}")
                     topics = []
                 
-                print("Identifying keywords...")
+                logger.info("Identifying keywords...")
                 try:
                     keywords = self.identify_keywords(transcription, show_progress=False)
                 except Exception as e:
-                    print(f"Warning: Keyword identification failed: {e}")
+                    logger.warning(f"Keyword identification failed: {e}")
                     keywords = []
                 
-                print("Detecting sponsor content...")
+                logger.info("Detecting sponsor content...")
                 try:
                     sponsor_segments = self.detect_sponsor_content(transcription, show_progress=False)
                 except Exception as e:
-                    print(f"Warning: Sponsor detection failed: {e}")
+                    logger.warning(f"Sponsor detection failed: {e}")
                     sponsor_segments = []
                 
                 analysis_time = time.time() - start_time
             
             # Show completion summary
-            print(f"✅ Analysis completed!")
-            print(f"   Summary: {len(summary.split())} words")
-            print(f"   Topics: {len(topics)} identified")
-            print(f"   Keywords: {len(keywords)} extracted")
-            print(f"   Sponsor segments: {len(sponsor_segments)} detected")
-            print(f"   Processing time: {analysis_time:.1f}s")
+            logger.info("Analysis completed!")
+            logger.info(f"   Summary: {len(summary.split())} words")
+            logger.info(f"   Topics: {len(topics)} identified")
+            logger.info(f"   Keywords: {len(keywords)} extracted")
+            logger.info(f"   Sponsor segments: {len(sponsor_segments)} detected")
+            logger.info(f"   Processing time: {analysis_time:.1f}s")
             
             return AnalysisResult(
                 summary=summary,
@@ -486,13 +489,13 @@ If no sponsor content is found, return an empty array: []"""
     def detect_sponsor_content(self, transcription: str, show_progress: bool = True) -> List[SponsorSegment]:
         """Detect sponsor content segments in transcription."""
         if not transcription or not transcription.strip():
-            print("Warning: Empty transcription provided for sponsor detection")
+            logger.warning("Empty transcription provided for sponsor detection")
             return []
         
         try:
             # Check if sponsor_detection prompt is available
             if 'sponsor_detection' not in self.prompts:
-                print("Warning: Sponsor detection prompt not available, skipping sponsor detection")
+                logger.warning("Sponsor detection prompt not available, skipping sponsor detection")
                 return []
             
             prompt = f"{self.prompts['sponsor_detection']}\n\nTranscription:\n{transcription}"
@@ -505,7 +508,7 @@ If no sponsor content is found, return an empty array: []"""
             try:
                 sponsor_data = json.loads(response.strip())
                 if not isinstance(sponsor_data, list):
-                    print("Warning: Claude returned invalid sponsor data format, skipping sponsor detection")
+                    logger.warning("Claude returned invalid sponsor data format, skipping sponsor detection")
                     return []
                 
                 sponsor_segments = []
@@ -528,16 +531,16 @@ If no sponsor content is found, return an empty array: []"""
                 
             except (json.JSONDecodeError, ValueError, KeyError) as e:
                 # If JSON parsing fails, assume no sponsor content
-                print(f"Warning: Failed to parse sponsor detection response: {e}")
+                logger.warning(f"Failed to parse sponsor detection response: {e}")
                 return []
             
         except ClaudeAPIError as e:
             # Claude API errors should be warnings for sponsor detection
-            print(f"Warning: Claude API error during sponsor detection: {e}")
+            logger.warning(f"Claude API error during sponsor detection: {e}")
             return []
         except Exception as e:
             # Other errors should also be warnings for sponsor detection
-            print(f"Warning: Failed to detect sponsor content: {e}")
+            logger.warning(f"Failed to detect sponsor content: {e}")
             return []
     
     def generate_markdown_output(self, output_doc: OutputDocument) -> str:
@@ -608,8 +611,8 @@ If no sponsor content is found, return an empty array: []"""
             # Show completion info
             word_count = len(markdown_content.split())
             line_count = len(markdown_content.split('\n'))
-            print(f"✅ Markdown document generated!")
-            print(f"   Document size: {word_count:,} words, {line_count:,} lines")
+            logger.info("Markdown document generated!")
+            logger.info(f"   Document size: {word_count:,} words, {line_count:,} lines")
             
             return markdown_content
             

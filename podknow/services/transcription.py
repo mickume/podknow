@@ -22,6 +22,14 @@ from ..exceptions import (
     NetworkError
 )
 from ..utils.progress import ProgressContext
+import logging
+from ..constants import (
+    DEFAULT_LANGUAGE_DETECTION_SKIP_MINUTES,
+    LANGUAGE_DETECTION_SAMPLE_DURATION,
+    PARAGRAPH_TIME_GAP_THRESHOLD
+)
+
+logger = logging.getLogger(__name__)
 
 
 class TranscriptionService:
@@ -135,7 +143,7 @@ class TranscriptionService:
         
         return False
     
-    def detect_language(self, audio_path: str, skip_minutes: float = 2.0, sample_duration: float = 30.0) -> str:
+    def detect_language(self, audio_path: str, skip_minutes: float = DEFAULT_LANGUAGE_DETECTION_SKIP_MINUTES, sample_duration: float = LANGUAGE_DETECTION_SAMPLE_DURATION) -> str:
         """
         Detect the language of the audio file using MLX-Whisper.
         Skips the first few minutes to avoid ads/intros in different languages.
@@ -232,7 +240,7 @@ class TranscriptionService:
                 detected_language = result.get("language", "unknown")
                 
                 # Show detection result
-                print(f"✅ Language detected: {detected_language.upper()}")
+                logger.info(f"Language detected: {detected_language.upper()}")
                 
                 # Validate English requirement
                 if detected_language != "en":
@@ -360,7 +368,7 @@ class TranscriptionService:
             start_time = time.time()
 
             if ProgressContext.should_show_progress():
-                print(f"Starting transcription of {audio_path}...")
+                logger.info(f"Starting transcription of {audio_path}...")
 
             # Get audio duration for progress estimation
             audio_duration = self._get_audio_duration(audio_path)
@@ -491,11 +499,11 @@ class TranscriptionService:
             actual_time = time.time() - start_time
             speed_ratio = audio_duration / actual_time if audio_duration > 0 and actual_time > 0 else 0
             
-            print(f"✅ Transcription completed!")
-            print(f"   Language: {language}")
-            print(f"   Confidence: {confidence:.2f}")
+            logger.info("Transcription completed!")
+            logger.info(f"   Language: {language}")
+            logger.info(f"   Confidence: {confidence:.2f}")
             if audio_duration > 0 and actual_time > 0:
-                print(f"   Speed: {speed_ratio:.1f}x realtime ({actual_time:.1f}s for {audio_duration:.1f}s audio)")
+                logger.info(f"   Speed: {speed_ratio:.1f}x realtime ({actual_time:.1f}s for {audio_duration:.1f}s audio)")
             
             return TranscriptionResult(
                 text=full_text,
@@ -536,7 +544,7 @@ class TranscriptionService:
         
         # Time gap heuristic - long pause suggests paragraph break
         time_gap = current_segment.get("start", 0) - previous_segment.get("end", 0)
-        if time_gap > 2.0:  # 2+ second gap
+        if time_gap > PARAGRAPH_TIME_GAP_THRESHOLD:  # 2+ second gap
             return True
         
         # Sentence ending heuristic - previous segment ends with sentence punctuation
@@ -659,7 +667,7 @@ class TranscriptionService:
             with open(output_path, 'w', encoding='utf-8') as f:
                 f.write(markdown_content)
             
-            print(f"Transcription saved to: {output_path}")
+            logger.info(f"Transcription saved to: {output_path}")
             return output_path
             
         except OSError as e:
@@ -819,6 +827,6 @@ class TranscriptionService:
         try:
             if os.path.exists(audio_path):
                 os.remove(audio_path)
-                print(f"Cleaned up temporary file: {audio_path}")
+                logger.debug(f"Cleaned up temporary file: {audio_path}")
         except OSError as e:
             raise FileOperationError(f"Failed to cleanup audio file {audio_path}: {str(e)}")

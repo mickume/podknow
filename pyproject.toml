@@ -133,13 +133,20 @@ select = [
     "I",  # isort
     "B",  # flake8-bugbear
     "C4", # flake8-comprehensions
-    "UP", # pyupgrade
+    "UP", # pyupgrade (includes f-string enforcement)
+    "RUF", # Ruff-specific rules
 ]
 ignore = [
     "E501",  # line too long, handled by black
     "B008",  # do not perform function calls in argument defaults
     "C901",  # too complex
 ]
+
+# Ruff configuration for string formatting
+# Enforces modern f-strings over .format() and % formatting
+# UP031: Use format specifiers instead of percent format
+# UP032: Use f-strings instead of .format() calls
+# UP034: Avoid % formatting in favor of f-strings
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

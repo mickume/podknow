@@ -4,6 +4,8 @@ RSS feed parsing service for podcast episodes.
 
 import feedparser
 import hashlib
+import logging
+from ..constants import EPISODE_ID_HASH_LENGTH
 from datetime import datetime
 from typing import List, Optional
 from urllib.parse import urlparse
@@ -11,6 +13,8 @@ from urllib.parse import urlparse
 from ..models.episode import Episode
 from ..models.podcast import PodcastMetadata
 from ..exceptions import PodKnowError
+
+logger = logging.getLogger(__name__)
 
 
 class RSSParsingError(PodKnowError):
@@ -197,7 +201,7 @@ class RSSFeedParser:
                         episodes.append(episode)
                 except Exception as e:
                     # Log the error but continue processing other episodes
-                    print(f"Warning: Failed to parse episode '{getattr(entry, 'title', 'Unknown')}': {e}")
+                    logger.warning(f"Failed to parse episode '{getattr(entry, 'title', 'Unknown')}': {e}")
                     continue
             
             # Sort episodes by publication date (newest first)
@@ -324,4 +328,4 @@ class RSSFeedParser:
         # Create a hash from title + audio_url + rss_url for uniqueness
         content = f"{title}|{audio_url}|{rss_url}"
         hash_object = hashlib.md5(content.encode('utf-8'))
-        return hash_object.hexdigest()[:12]  # Use first 12 characters for readability
+        return hash_object.hexdigest()[:EPISODE_ID_HASH_LENGTH]  # Use first 12 characters for readability

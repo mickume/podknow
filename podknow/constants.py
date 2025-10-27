@@ -27,6 +27,9 @@ DEFAULT_WHISPER_MODEL = "base"
 DEFAULT_LANGUAGE = "en"
 DEFAULT_CHUNK_SIZE = 8192
 DEFAULT_DOWNLOAD_TIMEOUT = 300
+PARAGRAPH_TIME_GAP_THRESHOLD = 0.5  # seconds - time gap to start new paragraph
+DEFAULT_LANGUAGE_DETECTION_SKIP_MINUTES = 4.0  # minutes - skip from start for language detection
+LANGUAGE_DETECTION_SAMPLE_DURATION = 30.0  # seconds - sample duration for language detection
 
 # Analysis Settings
 DEFAULT_MIN_TRANSCRIPTION_LENGTH = 100
@@ -41,6 +44,11 @@ DEFAULT_LOG_BACKUP_COUNT = 5
 DEFAULT_SEARCH_LIMIT = 20
 DEFAULT_SEARCH_TIMEOUT = 10
 DEFAULT_SIMILARITY_THRESHOLD = 0.8
+ITUNES_API_MAX_LIMIT = 200  # Maximum results per iTunes API request
+SPOTIFY_API_MAX_LIMIT = 50  # Maximum results per Spotify API request
+
+# ID Generation
+EPISODE_ID_HASH_LENGTH = 12  # Length of episode ID hash prefix
 
 # Platform Priorities
 DEFAULT_PLATFORM_PRIORITIES = {

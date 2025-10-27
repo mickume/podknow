@@ -19,6 +19,9 @@ from ..models.transcription import TranscriptionResult
 from ..models.analysis import AnalysisResult
 from ..models.output import OutputDocument
 from ..utils.progress import ProgressContext
+import logging
+
+logger = logging.getLogger(__name__)
 from ..services.discovery import PodcastDiscoveryService
 from ..services.episode import EpisodeListingService
 from ..services.transcription import TranscriptionService
@@ -101,7 +104,7 @@ class WorkflowLogger:
     
     def progress(self, message: str):
         """Log progress message (always shown)."""
-        print(f"[INFO] {message}", file=sys.stderr)
+        logger.info(message)
 
 
 class WorkflowState:
@@ -624,19 +627,19 @@ class WorkflowOrchestrator:
         else:
             # Fallback without rich progress bars
             if not skip_language_detection:
-                print("Detecting language...")
+                logger.info("Detecting language...")
                 detected_language = self.transcription_service.detect_language(
                     audio_file_path, skip_minutes=language_detection_skip_minutes
                 )
             else:
                 detected_language = "en"
             
-            print("Transcribing audio...")
+            logger.info("Transcribing audio...")
             transcription_result = self.transcription_service.transcribe_audio(audio_file_path)
             
             analysis_result = None
             if not skip_analysis and claude_api_key:
-                print("Analyzing content...")
+                logger.info("Analyzing content...")
                 analysis_service = self.get_analysis_service(claude_api_key)
                 analysis_result = analysis_service.analyze_transcription(transcription_result.text)
         
@@ -689,7 +692,7 @@ class WorkflowOrchestrator:
             
         except Exception as e:
             # If analysis fails, return None and let the workflow handle it
-            print(f"Warning: Analysis failed: {e}")
+            logger.warning(f"Analysis failed: {e}")
             return None
     
     def get_workflow_status(self) -> Dict[str, Any]:

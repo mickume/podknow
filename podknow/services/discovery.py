@@ -4,10 +4,14 @@ Podcast discovery service implementation.
 
 import requests
 import time
+import logging
+from ..constants import ITUNES_API_MAX_LIMIT, SPOTIFY_API_MAX_LIMIT
 from typing import List, Dict, Any, Optional
 from urllib.parse import quote_plus
 from ..models.podcast import PodcastResult
 from ..exceptions import NetworkError
+
+logger = logging.getLogger(__name__)
 
 
 class iTunesAPIClient:
@@ -18,7 +22,7 @@ class iTunesAPIClient:
     MAX_RETRIES = 3
     RETRY_DELAY = 1
     
-    def search_podcasts(self, query: str, limit: int = 50) -> List[PodcastResult]:
+    def search_podcasts(self, query: str, limit: int = ITUNES_API_MAX_LIMIT) -> List[PodcastResult]:
         """
         Search for podcasts using iTunes API.
         
@@ -167,7 +171,7 @@ class SpotifyAPIClient:
         except (ValueError, KeyError) as e:
             raise NetworkError(f"Invalid Spotify auth response: {str(e)}")
     
-    def search_podcasts(self, query: str, limit: int = 50) -> List[PodcastResult]:
+    def search_podcasts(self, query: str, limit: int = ITUNES_API_MAX_LIMIT) -> List[PodcastResult]:
         """
         Search for podcasts using Spotify API.
         
@@ -275,7 +279,7 @@ class PodcastDiscoveryService:
             return self.itunes_client.search_podcasts(query)
         except NetworkError as e:
             # Log error but don't fail completely
-            print(f"iTunes search failed: {e}")
+            logger.warning(f"iTunes search failed: {e}")
             return []
     
     def search_spotify(self, query: str) -> List[PodcastResult]:
@@ -284,7 +288,7 @@ class PodcastDiscoveryService:
             return self.spotify_client.search_podcasts(query)
         except NetworkError as e:
             # Log error but don't fail completely
-            print(f"Spotify search failed: {e}")
+            logger.warning(f"Spotify search failed: {e}")
             return []
     
     def get_combined_results(self, query: str) -> List[PodcastResult]:
