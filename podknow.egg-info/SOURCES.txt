@@ -31,6 +31,9 @@ podknow/services/episode.py
 podknow/services/rss.py
 podknow/services/transcription.py
 podknow/services/workflow.py
+podknow/utils/__init__.py
+podknow/utils/cli_errors.py
+podknow/utils/progress.py
 tests/test_analysis_service.py
 tests/test_cli.py
 tests/test_cli_integration.py

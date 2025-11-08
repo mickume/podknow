@@ -16,6 +16,9 @@ PodKnow is a command-line tool that enables users to discover, download, and tra
 - **Transcription_Engine**: The MLX-Whisper component that converts audio to text
 - **Analysis_Engine**: The Claude AI component that processes transcriptions
 - **Metadata_File**: Local markdown configuration file for LLM prompts and API settings
+- **Workflow_Orchestrator**: Service that coordinates multi-step operations with error recovery and state tracking
+- **Rich_Progress**: Enhanced CLI progress indicators using the Rich library for formatted output
+- **Workflow_State**: Object tracking current step, completed steps, failed steps, and intermediate results during workflow execution
 
 ## Requirements
 
@@ -90,3 +93,43 @@ PodKnow is a command-line tool that enables users to discover, download, and tra
 3. THE Metadata_File SHALL be formatted as markdown for easy editing
 4. WHEN Claude_API calls are made, THE Analysis_Engine SHALL use prompts defined in the Metadata_File
 5. THE PodKnow SHALL validate Metadata_File format and provide clear error messages for invalid configurations
+
+### Requirement 7
+
+**User Story:** As a user, I want robust workflow orchestration with error recovery, so that transient failures don't cause complete workflow failures and I can resume from checkpoints.
+
+#### Acceptance Criteria
+
+1. THE PodKnow SHALL provide a Workflow_Orchestrator that coordinates multi-step operations across discovery, transcription, and analysis
+2. WHEN a workflow step fails, THE Workflow_Orchestrator SHALL log the failure with context and attempt recovery where possible
+3. THE Workflow_Orchestrator SHALL track workflow state including completed steps, failed steps, and intermediate results
+4. WHEN errors occur, THE Workflow_Orchestrator SHALL cleanup temporary resources (audio files) automatically
+5. THE Workflow_Orchestrator SHALL provide detailed logging with configurable verbosity levels
+6. WHEN workflow operations complete, THE Workflow_Orchestrator SHALL report duration and success metrics
+
+### Requirement 8
+
+**User Story:** As a first-time user, I want guided configuration setup and validation, so that I can quickly get started with proper API credentials and settings.
+
+#### Acceptance Criteria
+
+1. THE PodKnow SHALL provide a `setup` command that creates default configuration with example prompts
+2. WHEN configuration exists and user runs setup, THE PodKnow SHALL require --force flag to overwrite
+3. THE PodKnow SHALL provide a `config-status` command that validates configuration and reports issues
+4. WHEN config-status is executed, THE PodKnow SHALL check for missing API keys and display environment variables
+5. THE config-status command SHALL verify required dependencies are installed and report system status
+6. WHEN configuration is invalid, THE PodKnow SHALL provide actionable recommendations for fixes
+
+### Requirement 9
+
+**User Story:** As a developer and power user, I want enhanced CLI features including verbose logging, progress indicators, and rich output formatting, so that I can debug issues and monitor long-running operations.
+
+#### Acceptance Criteria
+
+1. THE PodKnow SHALL support a --verbose flag that enables detailed debug logging to stderr
+2. THE PodKnow SHALL support a --log-file option that persists all logs to a specified file path
+3. WHEN transcription or analysis operations run, THE PodKnow SHALL display rich progress bars with percentages and elapsed time
+4. THE PodKnow SHALL use color-coded output with emojis for success (✅), errors (❌), and warnings (⚠️)
+5. WHEN multiple processing steps occur, THE PodKnow SHALL show unified progress bars that update for each sub-step
+6. THE PodKnow SHALL provide helpful error messages with troubleshooting tips for common failure scenarios
+7. THE PodKnow SHALL support --version flag to display current version information

@@ -5,6 +5,7 @@
 ```
 podknow/
 ├── __init__.py              # Package initialization and version info
+├── __main__.py              # Module entry point for python -m podknow
 ├── cli/                     # Command-line interface layer
 │   ├── __init__.py
 │   └── main.py             # Click-based CLI commands and entry point
@@ -18,7 +19,7 @@ podknow/
 ├── services/                # Business logic services
 │   ├── __init__.py         # Exports all service classes
 │   ├── analysis.py         # Claude AI integration for content analysis
-│   ├── config.py           # Configuration service
+│   ├── config.py           # Configuration service (legacy)
 │   ├── discovery.py        # iTunes/Spotify podcast search
 │   ├── episode.py          # Episode management and listing
 │   ├── rss.py              # RSS feed parsing
@@ -29,6 +30,11 @@ podknow/
 │   ├── default_config.md   # Default configuration template
 │   ├── manager.py          # ConfigManager class
 │   └── models.py           # Configuration data models
+├── utils/                   # Utility modules
+│   ├── __init__.py
+│   ├── cli_errors.py       # CLI error handling decorators
+│   └── progress.py         # Progress bar utilities and context
+├── constants.py             # Application constants
 └── exceptions.py           # Custom exception hierarchy
 ```
 
@@ -46,7 +52,15 @@ Each service class handles a specific domain:
 - `TranscriptionService`: Audio processing and MLX-Whisper integration
 - `AnalysisService`: Claude AI content analysis
 - `EpisodeListingService`: RSS feed parsing and episode management
-- `WorkflowOrchestrator`: Coordinates complex multi-step operations
+- `WorkflowOrchestrator`: Coordinates complex multi-step operations with error recovery
+
+### Orchestration Pattern
+The `WorkflowOrchestrator` implements the orchestration pattern:
+- Coordinates multiple services in complex workflows
+- Manages workflow state and intermediate results
+- Provides error recovery and resource cleanup
+- Lazy-loads services for better performance
+- Implements unified progress reporting across workflow steps
 
 ### Data Models
 All data structures use Pydantic for validation and serialization:
@@ -93,11 +107,13 @@ from ..models import *  # Don't do this
 - Base class: `PodKnowError` in `exceptions.py`
 - Domain-specific: `NetworkError`, `ConfigurationError`, `AnalysisError`
 - Service-specific: `TranscriptionError`, `EpisodeManagementError`
+- Processing errors: `AudioProcessingError`, `LanguageDetectionError`, `FileOperationError`
 
 ### Error Propagation
 - Services raise domain-specific exceptions
-- CLI layer catches and formats user-friendly messages
-- Workflow orchestrator handles retries and recovery
+- WorkflowOrchestrator catches errors, tracks state, and attempts recovery
+- CLI layer catches and formats user-friendly messages with troubleshooting tips
+- Utils module provides decorators for consistent error handling across CLI commands
 
 ## Configuration Management
 
