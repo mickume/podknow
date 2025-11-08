@@ -799,9 +799,9 @@ class TranscriptionService:
         
         # Remove None values
         frontmatter = {k: v for k, v in frontmatter.items() if v is not None}
-        
+
         # Format transcription with paragraph breaks
-        formatted_transcription = self._format_transcription_text(transcription_result)
+        formatted_transcription = self.format_transcription_text(transcription_result)
         
         # Combine into markdown
         markdown_content = f"""---
@@ -830,15 +830,15 @@ class TranscriptionService:
         
         return markdown_content
     
-    def _format_transcription_text(self, transcription_result: TranscriptionResult) -> str:
+    def format_transcription_text(self, transcription_result: TranscriptionResult) -> str:
         """
         Format transcription text with proper paragraph breaks.
-        
+
         Args:
             transcription_result: The transcription result
-            
+
         Returns:
-            str: Formatted transcription text
+            str: Formatted transcription text with paragraph breaks
         """
         if not transcription_result.segments:
             return transcription_result.text

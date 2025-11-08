@@ -553,7 +553,7 @@ Hard-coded numeric values scattered throughout the codebase reduced maintainabil
 Added to `podknow/constants.py`:
 ```python
 # Transcription Settings
-PARAGRAPH_TIME_GAP_THRESHOLD = 2.0  # seconds - time gap to start new paragraph
+PARAGRAPH_TIME_GAP_THRESHOLD = 0.5  # seconds - time gap to start new paragraph
 DEFAULT_LANGUAGE_DETECTION_SKIP_MINUTES = 2.0  # minutes - skip from start for language detection
 LANGUAGE_DETECTION_SAMPLE_DURATION = 30.0  # seconds - sample duration for language detection
 
@@ -569,7 +569,7 @@ EPISODE_ID_HASH_LENGTH = 12  # Length of episode ID hash prefix
 1. **transcription.py**:
    - `skip_minutes: float = 2.0` → `= DEFAULT_LANGUAGE_DETECTION_SKIP_MINUTES`
    - `sample_duration: float = 30.0` → `= LANGUAGE_DETECTION_SAMPLE_DURATION`
-   - `if time_gap > 2.0:` → `if time_gap > PARAGRAPH_TIME_GAP_THRESHOLD:`
+   - `if time_gap > 0.5:` → `if time_gap > PARAGRAPH_TIME_GAP_THRESHOLD:`
 
 2. **rss.py**:
    - `return hash_object.hexdigest()[:12]` → `[:EPISODE_ID_HASH_LENGTH]`
@@ -595,7 +595,7 @@ EPISODE_ID_HASH_LENGTH = 12  # Length of episode ID hash prefix
 **Magic Numbers Replaced:**
 | File | Original Value | New Constant |
 |------|----------------|--------------|
-| transcription.py | 2.0 (time gap) | PARAGRAPH_TIME_GAP_THRESHOLD |
+| transcription.py | 0.5 (time gap) | PARAGRAPH_TIME_GAP_THRESHOLD |
 | transcription.py | 2.0 (skip) | DEFAULT_LANGUAGE_DETECTION_SKIP_MINUTES |
 | transcription.py | 30.0 | LANGUAGE_DETECTION_SAMPLE_DURATION |
 | rss.py | 12 | EPISODE_ID_HASH_LENGTH |

@@ -445,9 +445,12 @@ class WorkflowOrchestrator:
                     )
                 else:
                     # Generate full output with analysis
+                    # Format transcription with proper paragraph breaks
+                    formatted_transcription = self.transcription_service.format_transcription_text(transcription_result)
+
                     output_doc = OutputDocument(
                         metadata=episode_metadata,
-                        transcription=transcription_result.text,
+                        transcription=formatted_transcription,
                         analysis=state.analysis_result,
                         processing_timestamp=datetime.now()
                     )

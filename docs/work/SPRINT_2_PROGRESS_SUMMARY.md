@@ -51,7 +51,7 @@ With today's work, we've resolved 20 out of 27 issues (**74% complete**), comple
 Added 6 new constants to `podknow/constants.py`:
 ```python
 # Transcription Settings
-PARAGRAPH_TIME_GAP_THRESHOLD = 2.0
+PARAGRAPH_TIME_GAP_THRESHOLD = 0.5
 DEFAULT_LANGUAGE_DETECTION_SKIP_MINUTES = 2.0
 LANGUAGE_DETECTION_SAMPLE_DURATION = 30.0
 

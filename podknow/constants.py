@@ -27,7 +27,7 @@ DEFAULT_WHISPER_MODEL = "base"
 DEFAULT_LANGUAGE = "en"
 DEFAULT_CHUNK_SIZE = 8192
 DEFAULT_DOWNLOAD_TIMEOUT = 300
-PARAGRAPH_TIME_GAP_THRESHOLD = 0.5  # seconds - time gap to start new paragraph
+PARAGRAPH_TIME_GAP_THRESHOLD = 0.7  # seconds - time gap to start new paragraph
 DEFAULT_LANGUAGE_DETECTION_SKIP_MINUTES = 4.0  # minutes - skip from start for language detection
 LANGUAGE_DETECTION_SAMPLE_DURATION = 30.0  # seconds - sample duration for language detection
 
