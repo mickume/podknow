@@ -724,33 +724,59 @@ class TranscriptionService:
     
     def generate_filename(self, episode_metadata: EpisodeMetadata) -> str:
         """
-        Generate filename based on episode metadata.
+        Generate filename based on episode metadata including episode title.
 
         Args:
             episode_metadata: Episode metadata
 
         Returns:
-            str: Generated filename
+            str: Generated filename in format: podcast_title_episode_title_identifier.md
         """
         # Clean podcast title for filename
         podcast_title = self._sanitize_filename(episode_metadata.podcast_title)
 
-        # Use episode number if available, otherwise use date
+        # Clean episode title for filename
+        episode_title = self._sanitize_filename(episode_metadata.episode_title)
+
+        # Create unique identifier: prefer episode number, fallback to date
         if episode_metadata.episode_number:
-            episode_part = f"ep{episode_metadata.episode_number:03d}"
+            identifier = f"ep{episode_metadata.episode_number:03d}"
         else:
             date_str = episode_metadata.publication_date.strftime("%Y%m%d")
-            episode_part = f"episode_{date_str}"
+            identifier = date_str
 
-        return f"{podcast_title}_{episode_part}.md"
+        # Combine parts: podcast_title_episode_title_identifier.md
+        # Limit total filename length to avoid filesystem issues
+        max_total_length = 200  # Leave room for .md extension
+
+        # Start with full components
+        base_filename = f"{podcast_title}_{episode_title}_{identifier}"
+
+        # If too long, truncate episode title first, then podcast title if needed
+        if len(base_filename) > max_total_length:
+            # Calculate available space for titles
+            reserved_length = len(identifier) + 2  # +2 for underscores
+            available_length = max_total_length - reserved_length
+
+            # Split available space between podcast and episode titles
+            podcast_max = min(len(podcast_title), available_length // 2)
+            episode_max = available_length - podcast_max
+
+            podcast_title = podcast_title[:podcast_max].strip('_')
+            episode_title = episode_title[:episode_max].strip('_')
+
+            base_filename = f"{podcast_title}_{episode_title}_{identifier}"
+
+        return f"{base_filename}.md"
     
-    def _sanitize_filename(self, filename: str) -> str:
+    def _sanitize_filename(self, filename: str, max_length: int = None) -> str:
         """
         Sanitize string for use in filename.
-        
+
         Args:
             filename: Original filename string
-            
+            max_length: Optional maximum length (no limit if None)
+
         Returns:
             str: Sanitized filename
         """
@@ -758,16 +784,22 @@ class TranscriptionService:
         invalid_chars = '<>:"/\\|?*'
         for char in invalid_chars:
             filename = filename.replace(char, '_')
-        
-        # Replace spaces with underscores and limit length
+
+        # Replace spaces with underscores and convert to lowercase
         filename = filename.replace(' ', '_').lower()
-        
+
         # Remove multiple consecutive underscores
         while '__' in filename:
             filename = filename.replace('__', '_')
-        
-        # Limit length and remove trailing underscores
-        return filename[:50].strip('_')
+
+        # Remove leading/trailing underscores
+        filename = filename.strip('_')
+
+        # Apply length limit if specified
+        if max_length:
+            filename = filename[:max_length].strip('_')
+
+        return filename
     
     def _format_markdown_content(
         self, 
