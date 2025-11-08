@@ -258,9 +258,31 @@ Be objective and informative.""",
 List each topic in one sentence that captures the essence of what was discussed. 
 Return only the topic sentences, one per line, without numbering or bullets.""",
             
-            "keywords": """Identify relevant keywords and tags for this podcast content. 
-Focus on specific terms, concepts, people, companies, or technologies mentioned. 
-Return ONLY the keywords separated by commas. Do not include any explanatory text, introductions, or additional commentary. Just the keywords.""",
+            "keywords": """Extract 30-40 highly specific, searchable keywords from this podcast content.
+
+FOCUS ON (in priority order):
+1. Named entities: Specific people, companies, products, books, organizations, places
+2. Technical terms: Technologies, methodologies, frameworks, tools, platforms
+3. Domain-specific concepts: Industry jargon, specialized terminology, specific theories
+4. Concrete topics: Specific events, projects, research areas, market segments
+
+EXAMPLES OF GOOD KEYWORDS:
+- "GPT-4", "Tesla Model S", "Y Combinator", "Sam Altman", "The Lean Startup"
+- "quantum entanglement", "CRISPR gene editing", "blockchain consensus"
+- "venture capital", "product-market fit", "A/B testing"
+
+EXAMPLES OF BAD KEYWORDS (DO NOT INCLUDE):
+- "technology", "innovation", "future", "growth", "success"
+- "artificial intelligence" (too broad - use specific AI technologies instead)
+- "leadership", "strategy", "business" (unless referring to specific methodologies)
+
+REQUIREMENTS:
+- Return 30-40 keywords total
+- Be as specific as possible - prefer "React hooks" over "web development"
+- Include version numbers, model names, or other specifics when mentioned
+- Use exact names as mentioned in the podcast
+
+Return ONLY the keywords separated by commas.""",
             
             "sponsor_detection": """Identify any sponsored content or advertisements in this transcription. 
 Look for promotional language, product endorsements, discount codes, or clear advertising segments.
@@ -443,21 +465,30 @@ If no sponsor content is found, return an empty array: []"""
         except Exception as e:
             raise AnalysisError(f"Failed to extract topics: {str(e)}")
     
-    def identify_keywords(self, transcription: str, show_progress: bool = True) -> List[str]:
-        """Identify relevant keywords from transcription."""
+    def identify_keywords(self, transcription: str, show_progress: bool = True, max_keywords: int = 20) -> List[str]:
+        """Identify relevant keywords from transcription.
+
+        Args:
+            transcription: The transcription text to analyze
+            show_progress: Whether to show progress indicator
+            max_keywords: Maximum number of keywords to return (default: 20)
+
+        Returns:
+            List of relevant keywords, limited to max_keywords
+        """
         if not transcription or not transcription.strip():
             raise AnalysisError("Transcription text is required for keyword identification")
-        
+
         try:
             prompt = f"{self.prompts['keywords']}\n\nTranscription:\n{transcription}"
             response = self.claude_client.send_message(prompt, show_progress=show_progress)
-            
+
             if not response or not response.strip():
                 raise AnalysisError("Claude API returned empty keywords response")
-            
+
             # Clean response by removing common prefatory text
             cleaned_response = response.strip()
-            
+
             # Remove common prefixes that Claude might add
             prefixes_to_remove = [
                 "Here are the relevant keywords:",
@@ -467,20 +498,59 @@ If no sponsor content is found, return an empty array: []"""
                 "The relevant keywords are:",
                 "The keywords are:"
             ]
-            
+
             for prefix in prefixes_to_remove:
                 if cleaned_response.lower().startswith(prefix.lower()):
                     cleaned_response = cleaned_response[len(prefix):].strip()
                     break
-            
+
             # Split by commas and clean keywords
-            keywords = [keyword.strip() for keyword in cleaned_response.split(',') if keyword.strip()]
-            
-            if not keywords:
+            raw_keywords = [keyword.strip() for keyword in cleaned_response.split(',') if keyword.strip()]
+
+            if not raw_keywords:
                 raise AnalysisError("No keywords extracted from transcription")
-            
-            return keywords
-            
+
+            # Filter out ONLY standalone generic terms (single-word fluff)
+            # Allow multi-word phrases even if they contain these words
+            generic_standalone_terms = {
+                'podcast', 'episode', 'discussion', 'conversation', 'interview',
+                'topic', 'important', 'interesting', 'great', 'good', 'bad',
+                'talk', 'today', 'show', 'series', 'video', 'audio', 'recording',
+                'things', 'stuff', 'ideas', 'thoughts', 'insights', 'points'
+            }
+
+            # Filter and clean keywords
+            filtered_keywords = []
+            for keyword in raw_keywords:
+                # Clean up the keyword first (remove quotes, extra spaces)
+                keyword = keyword.strip('"\'').strip()
+
+                # Skip empty or very short keywords
+                if len(keyword) < 2:
+                    continue
+
+                # Only filter out single-word generic terms
+                # Multi-word phrases are likely more specific (e.g., "AI podcast" vs "podcast")
+                words = keyword.split()
+                if len(words) == 1 and keyword.lower() in generic_standalone_terms:
+                    continue
+
+                # Add to filtered list
+                filtered_keywords.append(keyword)
+
+            # Limit to maximum number of keywords
+            if len(filtered_keywords) > max_keywords:
+                logger.info(f"Limiting keywords from {len(filtered_keywords)} to {max_keywords}")
+                filtered_keywords = filtered_keywords[:max_keywords]
+
+            if not filtered_keywords:
+                logger.warning("No keywords remained after filtering generic terms")
+                # Return a few of the original if filtering removed everything
+                return raw_keywords[:max_keywords]
+
+            logger.info(f"Extracted {len(filtered_keywords)} keywords")
+            return filtered_keywords
+
         except ClaudeAPIError:
             raise
         except Exception as e:

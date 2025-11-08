@@ -34,11 +34,31 @@ Aim for 3-8 topics depending on the episode length and content diversity.
 ### Keyword Identification Prompt
 
 ```
-Identify relevant keywords and tags for this podcast content. 
-Focus on specific terms, concepts, people, companies, technologies, or methodologies mentioned.
-Include both explicit mentions and implicit themes that would help categorize this content.
-Return only the keywords separated by commas, without explanations.
-Prioritize terms that would be useful for search and categorization.
+Extract 30-40 highly specific, searchable keywords from this podcast content.
+
+FOCUS ON (in priority order):
+1. Named entities: Specific people, companies, products, books, organizations, places
+2. Technical terms: Technologies, methodologies, frameworks, tools, platforms
+3. Domain-specific concepts: Industry jargon, specialized terminology, specific theories
+4. Concrete topics: Specific events, projects, research areas, market segments
+
+EXAMPLES OF GOOD KEYWORDS:
+- "GPT-4", "Tesla Model S", "Y Combinator", "Sam Altman", "The Lean Startup"
+- "quantum entanglement", "CRISPR gene editing", "blockchain consensus"
+- "venture capital", "product-market fit", "A/B testing"
+
+EXAMPLES OF BAD KEYWORDS (DO NOT INCLUDE):
+- "technology", "innovation", "future", "growth", "success"
+- "artificial intelligence" (too broad - use specific AI technologies instead)
+- "leadership", "strategy", "business" (unless referring to specific methodologies)
+
+REQUIREMENTS:
+- Return 130-40 keywords total
+- Be as specific as possible - prefer "React hooks" over "web development"
+- Include version numbers, model names, or other specifics when mentioned
+- Use exact names as mentioned in the podcast
+
+Return ONLY the keywords separated by commas.
 ```
 
 ### Sponsor Detection Prompt
@@ -201,17 +221,17 @@ The analysis prompts can be customized to match your specific needs:
 ### For Academic Research
 - Modify the summary prompt to focus on methodology and findings
 - Adjust topic extraction to identify research themes
-- Customize keywords to include academic terminology
+- Customize keywords to prioritize: researchers, institutions, specific studies, methodologies, scientific terms (15-20 keywords)
 
-### For Business Analysis  
+### For Business Analysis
 - Update prompts to focus on business insights and strategies
-- Include industry-specific terminology in keyword extraction
+- Customize keywords to emphasize: company names, executives, product names, market terms, frameworks (15-20 keywords)
 - Modify sponsor detection for business partnership identification
 
 ### For Content Creation
 - Adjust summary style for audience engagement
 - Focus topic extraction on content themes and narratives
-- Customize keywords for content categorization and SEO
+- Customize keywords for SEO: specific topics, creator names, platforms, tools, trends (15-20 keywords)
 
 ## Troubleshooting Configuration
 
